@@ -1,0 +1,18 @@
+[package]
+name = "kvasir"
+version = "0.1.0"
+description = "Workspace inspector and format converter"
+edition = "2021"
+
+[lib]
+name = "kvasir_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { workspace = true }
+
+[dependencies]
+kvasir_core = { path = "../../core/kvasir_core" }
+tauri = { workspace = true }
+tauri-plugin-opener = { workspace = true }
+tauri-plugin-dialog = { workspace = true }

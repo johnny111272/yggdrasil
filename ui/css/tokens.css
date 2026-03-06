@@ -1,0 +1,75 @@
+/**
+ * @introspection/ui Design Tokens
+ *
+ * Shared design system for Tauri viewer apps:
+ * - Svalinn (code quality viewer)
+ * - Hlidskjalf (file viewer)
+ * - Graph viewer (future)
+ *
+ * Dark theme optimized for reduced eye strain.
+ */
+
+:root {
+  /* ===== Background Colors ===== */
+  --bg-primary: #1a1a2e;        /* Body background */
+  --bg-secondary: #16213e;      /* Panels, cards, sidebar */
+  --bg-tertiary: #262640;       /* Borders, dividers */
+  --bg-hover: #1d2a4d;          /* Hover state */
+  --bg-selected: #2d3a5d;       /* Selected/active state */
+
+  /* ===== Text Colors ===== */
+  --text-primary: #eee;         /* Main text */
+  --text-secondary: #888;       /* Labels, subtitles */
+  --text-muted: #ccc;           /* Descriptions, less important */
+
+  /* ===== Border Colors ===== */
+  --border-default: #333;       /* Standard borders */
+  --border-subtle: #262640;     /* Subtle dividers */
+
+  /* ===== Severity Colors ===== */
+  --severity-blocked: #ff44ff;  /* Magenta - gaming the system */
+  --severity-error: #ff3333;    /* Red - violations */
+  --severity-warning: #ffd93d;  /* Yellow - concerns */
+  --severity-info: #6bcb77;     /* Green - info/success */
+
+  /* ===== Interactive Colors ===== */
+  --action-primary: #4361ee;          /* Primary buttons */
+  --action-primary-hover: #3a56d4;    /* Primary hover */
+  --action-special: #7b2cbf;          /* Special actions */
+  --action-special-hover: #6a24a8;    /* Special hover */
+  --action-neutral: #333;             /* Neutral buttons */
+  --action-neutral-hover: #444;       /* Neutral hover */
+
+  /* ===== Spacing Scale ===== */
+  --space-xs: 0.25rem;          /* 4px */
+  --space-sm: 0.35rem;          /* ~6px */
+  --space-md: 0.5rem;           /* 8px */
+  --space-lg: 0.75rem;          /* 12px */
+  --space-xl: 1rem;             /* 16px */
+  --space-2xl: 1.5rem;          /* 24px */
+  --space-3xl: 2rem;            /* 32px */
+
+  /* ===== Border Radius ===== */
+  --radius-sm: 4px;             /* Inputs, buttons */
+  --radius-md: 8px;             /* Panels, cards */
+  --radius-full: 999px;         /* Badges, pills */
+
+  /* ===== Typography ===== */
+  --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+
+  --text-xs: 0.75rem;           /* 12px - badges */
+  --text-sm: 0.875rem;          /* 14px - body text */
+  --text-base: 1rem;            /* 16px - default */
+  --text-lg: 1.25rem;           /* 20px */
+  --text-xl: 1.5rem;            /* 24px */
+  --text-2xl: 2rem;             /* 32px - stat values */
+  --text-3xl: 2.5rem;           /* 40px - headings */
+
+  /* ===== Layout ===== */
+  --sidebar-width: 280px;
+
+  /* ===== Shadows ===== */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.3);
+}

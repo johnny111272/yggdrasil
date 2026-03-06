@@ -1,0 +1,13 @@
+{
+  "name": "@introspection/ui",
+  "version": "0.1.0",
+  "type": "module",
+  "svelte": "./index.js",
+  "exports": {
+    ".": "./index.js",
+    "./css/*": "./css/*"
+  },
+  "peerDependencies": {
+    "svelte": "^5.0.0"
+  }
+}

@@ -1,0 +1,69 @@
+/**
+ * @introspection/ui Base Styles
+ *
+ * Minimal reset and global styles for Tauri apps.
+ * Import after tokens.css.
+ */
+
+/* Reset */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+/* Body */
+body {
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Links */
+a {
+  color: var(--action-primary);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+/* Code */
+code, pre {
+  font-family: var(--font-mono);
+}
+
+/* Scrollbar styling (webkit) */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-primary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-default);
+  border-radius: var(--radius-sm);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--action-neutral-hover);
+}
+
+/* Selection */
+::selection {
+  background: var(--action-primary);
+  color: var(--text-primary);
+}
+
+/* Focus outline */
+:focus-visible {
+  outline: 2px solid var(--action-primary);
+  outline-offset: 2px;
+}

@@ -1,0 +1,18 @@
+[package]
+name = "ratatoskr"
+version = "0.1.0"
+description = "Graph viewer with D3 visualization"
+edition = "2021"
+
+[lib]
+name = "ratatoskr_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { workspace = true }
+
+[dependencies]
+ratatoskr_core = { path = "../../core/ratatoskr_core" }
+tauri = { workspace = true }
+tauri-plugin-opener = { workspace = true }
+tauri-plugin-dialog = { workspace = true }

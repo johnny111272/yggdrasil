@@ -1,0 +1,22 @@
+[package]
+name = "yggdrasil"
+version = "0.1.0"
+description = "Unified introspection shell"
+edition = "2021"
+
+[lib]
+name = "yggdrasil_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { workspace = true }
+
+[dependencies]
+hlidskjalf_core = { path = "../../core/hlidskjalf_core" }
+svalinn_core = { path = "../../core/svalinn_core" }
+kvasir_core = { path = "../../core/kvasir_core" }
+ratatoskr_core = { path = "../../core/ratatoskr_core" }
+tauri = { workspace = true }
+tauri-plugin-opener = { workspace = true }
+tauri-plugin-dialog = { workspace = true }
+tokio = { workspace = true }
