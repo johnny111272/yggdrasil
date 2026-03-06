@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-WORKSPACE="/Users/johnny/.ai/introspection"
+WORKSPACE="/Users/johnny/.ai/yggdrasil"
 BUNDLE_DIR="$WORKSPACE/target/release/bundle/macos"
 DEST="/Applications"
 
