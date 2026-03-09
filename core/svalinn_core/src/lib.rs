@@ -84,10 +84,10 @@ struct SidecarIssue {
     canary: Option<String>,
 }
 
-fn find_sidecars(directory: &str, include_tests: bool) -> Vec<PathBuf> {
+fn find_sidecars(directory: &str, include_tests: bool) -> Result<Vec<PathBuf>, String> {
     let pattern = format!("{}/**/.*.qa", directory);
-    glob(&pattern)
-        .expect("Invalid glob pattern")
+    Ok(glob(&pattern)
+        .map_err(|e| format!("Invalid glob pattern: {}", e))?
         .filter_map(Result::ok)
         .filter(|path| {
             if include_tests {
@@ -96,7 +96,7 @@ fn find_sidecars(directory: &str, include_tests: bool) -> Vec<PathBuf> {
                 !path.components().any(|c| c.as_os_str() == "tests")
             }
         })
-        .collect()
+        .collect())
 }
 
 fn read_sidecar(path: &Path) -> Result<Vec<Issue>, String> {
@@ -129,7 +129,7 @@ fn read_sidecar(path: &Path) -> Result<Vec<Issue>, String> {
 // ============================================================================
 
 pub fn scan_directory(directory: &str, include_tests: bool) -> Result<ScanResult, String> {
-    let sidecars = find_sidecars(directory, include_tests);
+    let sidecars = find_sidecars(directory, include_tests)?;
 
     let mut all_issues: Vec<Issue> = vec![];
     let mut files_scanned = 0;
@@ -167,13 +167,7 @@ pub fn scan_directory(directory: &str, include_tests: bool) -> Result<ScanResult
     })
 }
 
-pub fn open_in_editor(path: &str, line: usize) -> Result<(), String> {
-    std::process::Command::new("code")
-        .args(["--goto", &format!("{}:{}", path, line)])
-        .spawn()
-        .map_err(|e| e.to_string())?;
-    Ok(())
-}
+pub use yggdrasil_shared::open_in_editor;
 
 pub fn run_saga(directory: &str) -> Result<SagaResult, String> {
     let saga_path = dirs::home_dir()

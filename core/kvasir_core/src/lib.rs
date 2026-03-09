@@ -130,13 +130,7 @@ pub fn read_file(path: &str) -> Result<FileContent, String> {
     })
 }
 
-pub fn open_in_editor(path: &str, line: usize) -> Result<(), String> {
-    std::process::Command::new("code")
-        .args(["--goto", &format!("{}:{}", path, line)])
-        .spawn()
-        .map_err(|e| e.to_string())?;
-    Ok(())
-}
+pub use yggdrasil_shared::open_in_editor;
 
 pub fn convert_all_formats(content: &str, source_format: &str) -> Result<AllFormats, String> {
     let value: serde_json::Value = match source_format {

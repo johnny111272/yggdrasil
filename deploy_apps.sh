@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-WORKSPACE="/Users/johnny/.ai/yggdrasil"
+WORKSPACE="/Users/johnny/.ai/smidja/yggdrasil"
 BUNDLE_DIR="$WORKSPACE/target/release/bundle/macos"
 DEST="/Applications"
 
@@ -14,7 +14,7 @@ for app in "${APPS[@]}"; do
     npx tauri build 2>&1 | tail -3
 done
 
-# Copy to /Applications (remove old first)
+# Move to /Applications (remove old first)
 for app in "${APPS[@]}"; do
     src="$BUNDLE_DIR/$app.app"
     dst="$DEST/$app.app"
@@ -30,10 +30,22 @@ for app in "${APPS[@]}"; do
         rm -rf "$dst"
     fi
 
-    echo "==> Copying $app.app to $DEST"
-    cp -R "$src" "$dst"
+    echo "==> Moving $app.app to $DEST"
+    mv "$src" "$dst"
 done
 
+# Clean build artifacts to reclaim disk space
+echo ""
+echo "==> Cleaning build artifacts"
+rm -rf "$WORKSPACE/target/release/bundle"
+rm -rf "$WORKSPACE/target/release/deps"
+rm -rf "$WORKSPACE/target/release/build"
+rm -rf "$WORKSPACE/target/release/.fingerprint"
+
+# Show result
 echo ""
 echo "Done. Deployed:"
 ls -ld /Applications/{hlidskjalf,svalinn,kvasir,ratatoskr,yggdrasil}.app 2>/dev/null
+
+echo ""
+du -sh "$WORKSPACE/target" 2>/dev/null || true

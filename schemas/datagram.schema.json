@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "datagram-schema-v1",
+  "title": "Hlidskjalf Datagram",
+  "description": "Event datagram for the Hlidskjalf messaging protocol.",
+  "type": "object",
+  "required": ["timestamp", "source", "type", "priority", "workspace"],
+  "additionalProperties": false,
+  "properties": {
+    "timestamp": {
+      "type": "number",
+      "description": "Unix epoch timestamp in seconds (float64)."
+    },
+    "source": {
+      "type": "string",
+      "pattern": "^[a-z0-9_]{1,64}$",
+      "description": "Sending component identifier."
+    },
+    "type": {
+      "type": "string",
+      "enum": ["alert", "report", "canary", "notify"],
+      "description": "Event class."
+    },
+    "priority": {
+      "type": "string",
+      "enum": ["critical", "high", "normal", "low", "trace"],
+      "description": "Severity level for threshold filtering."
+    },
+    "workspace": {
+      "type": "string",
+      "maxLength": 128,
+      "description": "Project context. Empty string if not workspace-scoped."
+    },
+    "detail": {
+      "type": "string",
+      "maxLength": 512,
+      "description": "Human-readable event summary."
+    },
+    "speech": {
+      "type": "string",
+      "maxLength": 256,
+      "description": "Text for spoken voice alert. Omit to let receiver generate or skip."
+    },
+    "payload": {
+      "type": "object",
+      "description": "Type-specific structured data. Schema varies by type+source."
+    }
+  }
+}

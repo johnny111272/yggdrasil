@@ -1441,6 +1441,7 @@ version = "0.1.0"
 dependencies = [
  "serde",
  "serde_json",
+ "socket_emit",
  "tokio",
 ]
 
@@ -1880,6 +1881,7 @@ dependencies = [
  "serde_toon2",
  "serde_yaml",
  "toml 0.8.2",
+ "yggdrasil_shared",
 ]
 
 [[package]]
@@ -3328,6 +3330,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "socket_emit"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "softbuffer"
 version = "0.4.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3431,6 +3441,7 @@ dependencies = [
  "glob",
  "serde",
  "serde_json",
+ "yggdrasil_shared",
 ]
 
 [[package]]
@@ -5295,6 +5306,10 @@ dependencies = [
  "tauri-plugin-opener",
  "tokio",
 ]
+
+[[package]]
+name = "yggdrasil_shared"
+version = "0.1.0"
 
 [[package]]
 name = "yoke"

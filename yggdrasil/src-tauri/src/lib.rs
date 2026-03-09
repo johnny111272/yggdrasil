@@ -7,7 +7,7 @@ use tauri::Emitter;
 #[tauri::command]
 async fn hlid_start_listener(app: tauri::AppHandle) -> Result<(), String> {
     let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
-    hlidskjalf_core::start_listener(tx).await?;
+    hlidskjalf_core::start_all(tx).await?;
     tokio::spawn(async move {
         while let Some(event) = rx.recv().await {
             let _ = app.emit("hook-event", &event);
