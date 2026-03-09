@@ -1,6 +1,6 @@
 <script lang="ts">
-  import "@introspection/ui/css/tokens.css";
-  import "@introspection/ui/css/base.css";
+  import "@yggdrasil/ui/css/tokens.css";
+  import "@yggdrasil/ui/css/base.css";
 
   import type { Snippet } from "svelte";
 

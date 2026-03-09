@@ -39,13 +39,13 @@ None of them felt uncertain while doing it.
 
 ### Forgetting Command Prefixes in Unified Shell
 **Detection:** If you find a Tauri command registration in Yggdrasil's `lib.rs` without a 4-letter prefix...
-**Why it's wrong:** Each standalone app registers commands with bare names (`start_listener`, `speak`). Yggdrasil hosts all four apps in one process — command names must be globally unique. The convention is 4-letter prefixes: `hlid_start_listener`, `sval_scan`, `kvas_list_dir`, `rata_load_graph`. View components receive a `commands` prop that maps bare names to prefixed names.
-**Recovery:** Read PLAN_UNIFIED_SHELL.md "Tauri Command Prefixing" section.
+**Why it's wrong:** Each standalone app registers commands with bare names (`start_monitor`, `speak`). Yggdrasil hosts all four apps in one process — command names must be globally unique. The convention is 4-letter prefixes: `hlid_start_monitor`, `sval_scan_directory`, `kvas_list_directory`, `rata_load_graph`. View components receive a `commands` prop that maps bare names to prefixed names.
+**Recovery:** Read PLAN_UNIFIED_SHELL.md "Command Naming Convention" section.
 
 ### Confusing the Datagram Schema with HookEvent
 **Detection:** If you find `HookEvent` fields on a datagram struct, or datagram fields on a hook event handler...
-**Why it's wrong:** The datagram format (`schemas/datagram.schema.json`) is the forward-looking protocol. The legacy `HookEvent` format is backward-compatible but deprecated. New code should emit and consume datagrams. Hlidskjalf accepts both via the `hook-event` Tauri event (which deserializes both shapes), but new payload types should use datagram fields.
-**Recovery:** Read HLIDSKJALF_DATAGRAM.md and `schemas/datagram.schema.json`.
+**Why it's wrong:** The canonical `Datagram` struct lives in nornir's `socket_emit` crate with typed `DatagramKind` and `Priority` enums. `hlidskjalf_core` re-exports these types. The legacy `HookEvent` format is backward-compatible but deprecated. New code should emit and consume `Datagram` with enum variants, not strings. The Tauri event name is `"datagram"` (not the old `"hook-event"`).
+**Recovery:** Read HLIDSKJALF_DATAGRAM.md and `schemas/datagram.schema.json`. Check nornir `socket_emit/src/lib.rs` for the canonical struct.
 
 ### Putting Display Logic in Core Crates
 **Detection:** If you find HTML, CSS, component references, or frontend formatting in a `*_core` crate...

@@ -1,22 +1,20 @@
 # Svalinn - Code Quality Viewer
 
-**Svalinn** (Norse: Odin's high seat from which he could see all worlds) is a desktop dashboard for viewing code quality reports from multiple static analysis tools.
+**Svalinn** (Norse: the shield that stands before the sun) is a desktop dashboard for viewing code quality reports from saga/gleipnir QA sidecars.
 
 ## Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    Svalinn (Tauri App)                   │
+│                    Svalinn (Tauri App)                       │
 ├─────────────────────────────────────────────────────────────┤
 │  Frontend (Svelte 5)           │  Backend (Rust)            │
 │  ─────────────────────         │  ────────────────          │
-│  • Directory picker            │  • Tool runners:           │
-│  • Tool toggles                │    - ruff                  │
-│  • View modes (file/code/tool) │    - basedpyright          │
-│  • Severity filters            │    - radon                 │
-│  • Search                      │    - gleipnir              │
-│  • Grouped issue display       │  • File counting           │
-│  • Click-to-open in VS Code    │  • Result aggregation      │
+│  • QA tree navigation          │  • scan_directory()        │
+│  • Severity filtering          │  • list_qa_tree()          │
+│  • Search                      │  • open_in_editor()        │
+│  • Grouped issue display       │  • run_saga()              │
+│  • Click-to-open in VS Code    │  • QA sidecar parsing      │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -24,46 +22,47 @@
 
 - **Tauri 2.x**: Rust backend + system webview
 - **Svelte 5**: Frontend with runes ($state, $derived)
-- **TypeScript**: Type-safe frontend code
+- **@yggdrasil/ui**: Shared component library
 
 ## Key Files
 
 ```
-~/.ai/svalinn/
+svalinn/
 ├── src/
+│   └── lib/
+│       └── SvalinnView.svelte      # Main UI (git add -f required)
 │   └── routes/
-│       └── +page.svelte      # Main UI (all frontend code)
+│       └── +page.svelte            # Thin wrapper: <SvalinnView />
 ├── src-tauri/
 │   ├── src/
-│   │   └── lib.rs            # Rust backend (tool runners, commands)
-│   ├── Cargo.toml            # Rust dependencies
+│   │   ├── main.rs                 # svalinn_lib::run()
+│   │   └── lib.rs                  # Tauri wrappers
+│   ├── Cargo.toml                  # deps: svalinn_core, common_core, tauri
 │   └── capabilities/
-│       └── default.json      # Tauri permissions
-├── package.json              # Node dependencies
-└── OVERVIEW.md               # This file
+│       └── default.json            # Tauri permissions
+├── package.json
+└── OUTLINE.md
 ```
 
-## Running
+## Commands
 
-```bash
-cd ~/.ai/svalinn
-npm run tauri dev
-```
+| Standalone | Yggdrasil (prefixed) | Description |
+|-----------|---------------------|-------------|
+| `scan_directory` | `sval_scan_directory` | Scan QA sidecars, aggregate issues |
+| `list_qa_tree` | `sval_list_qa_tree` | List directory with QA sidecar info |
+| `open_in_editor` | `sval_open_in_editor` | Open file in VS Code |
+| `run_saga` | `sval_run_saga` | Run saga quality scanner |
 
-## Tool Integration
+## QA Sidecar Format
 
-Each tool is called via subprocess and parsed:
+Saga writes `.qa` sidecar files co-located with source files.
+Path: `src/module.py` → `.module.py.qa`
 
-| Tool | Command | Output Format |
-|------|---------|---------------|
-| ruff | `ruff check --output-format=json <dir>` | JSON array |
-| basedpyright | `basedpyright --outputjson <dir>` | JSON with generalDiagnostics |
-| radon | `radon cc --json <dir>` | JSON file map |
-| gleipnir | `python file_guardrails.py <dir> --json` | JSON array |
+Issues come from: gleipnir (custom guardrails), ruff (linting), basedpyright (type checking).
 
-## Future Plans
+## Related Apps
 
-- **Saga integration**: Read from .phoenix/ cache instead of running tools directly
-- **D3 visualizations**: Dependency graphs, complexity heatmaps
-- **Real-time updates**: Watch mode with file system events
-- **MITM viewer**: Repurpose for Claude Code traffic inspection
+- **Hlidskjalf**: Agent monitor
+- **Kvasir**: Workspace inspector
+- **Ratatoskr**: Graph viewer
+- **@yggdrasil/ui**: Shared components

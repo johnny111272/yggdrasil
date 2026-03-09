@@ -1,7 +1,7 @@
 {
   "name": "svalinn",
   "version": "0.1.0",
-  "description": "",
+  "description": "Code quality viewer",
   "type": "module",
   "scripts": {
     "dev": "vite dev",
@@ -13,7 +13,7 @@
   },
   "license": "MIT",
   "dependencies": {
-    "@introspection/ui": "file:../ui",
+    "@yggdrasil/ui": "file:../ui",
     "@tauri-apps/api": "^2.10.1",
     "@tauri-apps/plugin-dialog": "^2.6.0",
     "@tauri-apps/plugin-opener": "^2"

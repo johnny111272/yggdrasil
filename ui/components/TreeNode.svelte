@@ -66,7 +66,7 @@
   <span class="tree-icon">{getIcon()}</span>
   <span class="tree-name">{node.name}</span>
   {#if count > 0}
-    <Badge {count} severity={severity as "blocked" | "error" | "warning" | "info" | "neutral"} />
+    <Badge {count} severity={severity as "blocked" | "error" | "warning" | "success" | "neutral"} />
   {/if}
 </div>
 

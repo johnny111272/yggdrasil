@@ -57,7 +57,7 @@ pub struct SvalFileTreeEntry {
 // ============================================================================
 
 #[derive(Debug, Deserialize)]
-struct SanityReport {
+struct QaSidecarReport {
     file: String,
     #[allow(dead_code)]
     relative_path: Option<String>,
@@ -103,7 +103,7 @@ fn read_sidecar(path: &Path) -> Result<Vec<Issue>, String> {
     let content = std::fs::read_to_string(path)
         .map_err(|e| format!("Failed to read {}: {}", path.display(), e))?;
 
-    let report: SanityReport = serde_json::from_str(&content)
+    let report: QaSidecarReport = serde_json::from_str(&content)
         .map_err(|e| format!("Failed to parse {}: {}", path.display(), e))?;
 
     Ok(report
@@ -167,7 +167,7 @@ pub fn scan_directory(directory: &str, include_tests: bool) -> Result<ScanResult
     })
 }
 
-pub use yggdrasil_shared::open_in_editor;
+pub use common_core::open_in_editor;
 
 pub fn run_saga(directory: &str) -> Result<SagaResult, String> {
     let saga_path = dirs::home_dir()
@@ -224,7 +224,7 @@ fn parse_saga_output(output: &str) -> (usize, usize) {
     (0, 0)
 }
 
-pub fn list_directory(directory: &str) -> Result<Vec<SvalFileTreeEntry>, String> {
+pub fn list_qa_tree(directory: &str) -> Result<Vec<SvalFileTreeEntry>, String> {
     let dir_path = Path::new(directory);
     if !dir_path.is_dir() {
         return Err(format!("Not a directory: {}", directory));

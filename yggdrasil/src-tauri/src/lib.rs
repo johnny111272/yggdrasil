@@ -5,12 +5,12 @@ use tauri::Emitter;
 // ============================================================================
 
 #[tauri::command]
-async fn hlid_start_listener(app: tauri::AppHandle) -> Result<(), String> {
+async fn hlid_start_monitor(app: tauri::AppHandle) -> Result<(), String> {
     let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
     hlidskjalf_core::start_all(tx).await?;
     tokio::spawn(async move {
         while let Some(event) = rx.recv().await {
-            let _ = app.emit("hook-event", &event);
+            let _ = app.emit("datagram", &event);
         }
     });
     Ok(())
@@ -41,8 +41,8 @@ fn sval_run_saga(directory: String) -> Result<svalinn_core::SagaResult, String> 
 }
 
 #[tauri::command]
-fn sval_list_directory(directory: String) -> Result<Vec<svalinn_core::SvalFileTreeEntry>, String> {
-    svalinn_core::list_directory(&directory)
+fn sval_list_qa_tree(directory: String) -> Result<Vec<svalinn_core::SvalFileTreeEntry>, String> {
+    svalinn_core::list_qa_tree(&directory)
 }
 
 // ============================================================================
@@ -65,13 +65,13 @@ fn kvas_open_in_editor(path: String, line: usize) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn kvas_convert_all_formats(content: String, source_format: String) -> Result<kvasir_core::AllFormats, String> {
-    kvasir_core::convert_all_formats(&content, &source_format)
+fn kvas_convert_to_all_formats(content: String, source_format: String) -> Result<kvasir_core::AllFormats, String> {
+    kvasir_core::convert_to_all_formats(&content, &source_format)
 }
 
 #[tauri::command]
-fn kvas_is_data_file(path: String) -> Option<String> {
-    kvasir_core::is_data_file(&path)
+fn kvas_detect_data_format(path: String) -> Option<String> {
+    kvasir_core::detect_data_format(&path)
 }
 
 // ============================================================================
@@ -109,19 +109,19 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             // Hlidskjalf
-            hlid_start_listener,
+            hlid_start_monitor,
             hlid_speak,
             // Svalinn
             sval_scan_directory,
             sval_open_in_editor,
             sval_run_saga,
-            sval_list_directory,
+            sval_list_qa_tree,
             // Kvasir
             kvas_list_directory,
             kvas_read_file,
             kvas_open_in_editor,
-            kvas_convert_all_formats,
-            kvas_is_data_file,
+            kvas_convert_to_all_formats,
+            kvas_detect_data_format,
             // Ratatoskr
             rata_load_graph,
             rata_save_graph,

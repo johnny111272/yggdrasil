@@ -16,8 +16,8 @@ fn run_saga(directory: String) -> Result<SagaResult, String> {
 }
 
 #[tauri::command]
-fn list_directory(directory: String) -> Result<Vec<SvalFileTreeEntry>, String> {
-    svalinn_core::list_directory(&directory)
+fn list_qa_tree(directory: String) -> Result<Vec<SvalFileTreeEntry>, String> {
+    svalinn_core::list_qa_tree(&directory)
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -25,7 +25,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
-        .invoke_handler(tauri::generate_handler![scan_directory, open_in_editor, run_saga, list_directory])
+        .invoke_handler(tauri::generate_handler![scan_directory, open_in_editor, run_saga, list_qa_tree])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

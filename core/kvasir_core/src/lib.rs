@@ -130,9 +130,9 @@ pub fn read_file(path: &str) -> Result<FileContent, String> {
     })
 }
 
-pub use yggdrasil_shared::open_in_editor;
+pub use common_core::open_in_editor;
 
-pub fn convert_all_formats(content: &str, source_format: &str) -> Result<AllFormats, String> {
+pub fn convert_to_all_formats(content: &str, source_format: &str) -> Result<AllFormats, String> {
     let value: serde_json::Value = match source_format {
         "json" => serde_json::from_str(content)
             .map_err(|e| format!("Invalid JSON: {}", e))?,
@@ -167,38 +167,26 @@ pub fn convert_all_formats(content: &str, source_format: &str) -> Result<AllForm
 
     Ok(AllFormats {
         json: FormatConversion {
-            token_count: count_tokens(&json_content),
+            token_count: estimate_token_count(&json_content),
             content: json_content,
         },
         yaml: FormatConversion {
-            token_count: count_tokens(&yaml_content),
+            token_count: estimate_token_count(&yaml_content),
             content: yaml_content,
         },
         toml: FormatConversion {
-            token_count: count_tokens(&toml_content),
+            token_count: estimate_token_count(&toml_content),
             content: toml_content,
         },
         toon: FormatConversion {
-            token_count: count_tokens(&toon_content),
+            token_count: estimate_token_count(&toon_content),
             content: toon_content,
         },
         source_format: source_format.to_string(),
     })
 }
 
-pub fn is_data_file(path: &str) -> Option<String> {
-    detect_data_format(path)
-}
-
-// ============================================================================
-// Internal Helpers
-// ============================================================================
-
-fn count_tokens(content: &str) -> usize {
-    content.len() / 4
-}
-
-fn detect_data_format(path: &str) -> Option<String> {
+pub fn detect_data_format(path: &str) -> Option<String> {
     let path = Path::new(path);
     let ext = path.extension()?.to_string_lossy().to_lowercase();
     match ext.as_str() {
@@ -208,6 +196,14 @@ fn detect_data_format(path: &str) -> Option<String> {
         "toon" => Some("toon".to_string()),
         _ => None,
     }
+}
+
+// ============================================================================
+// Internal Helpers
+// ============================================================================
+
+fn estimate_token_count(content: &str) -> usize {
+    content.len() / 4
 }
 
 fn detect_language(extension: &str) -> String {

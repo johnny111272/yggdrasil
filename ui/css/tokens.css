@@ -1,10 +1,11 @@
 /**
- * @introspection/ui Design Tokens
+ * @yggdrasil/ui Design Tokens
  *
- * Shared design system for Tauri viewer apps:
+ * Shared design system for Yggdrasil Tauri apps:
+ * - Hlidskjalf (agent monitor)
  * - Svalinn (code quality viewer)
- * - Hlidskjalf (file viewer)
- * - Graph viewer (future)
+ * - Kvasir (workspace inspector)
+ * - Ratatoskr (graph viewer)
  *
  * Dark theme optimized for reduced eye strain.
  */
@@ -30,7 +31,7 @@
   --severity-blocked: #ff44ff;  /* Magenta - gaming the system */
   --severity-error: #ff3333;    /* Red - violations */
   --severity-warning: #ffd93d;  /* Yellow - concerns */
-  --severity-info: #6bcb77;     /* Green - info/success */
+  --severity-success: #6bcb77;  /* Green - success/good */
 
   /* ===== Interactive Colors ===== */
   --action-primary: #4361ee;          /* Primary buttons */

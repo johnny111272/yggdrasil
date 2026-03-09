@@ -740,7 +740,7 @@ pub fn generate_sample_graph() -> GraphData {
         },
         GraphNode {
             id: "ui".to_string(),
-            label: "@introspection/ui".to_string(),
+            label: "@yggdrasil/ui".to_string(),
             node_type: "library".to_string(),
             color: Some("#6bcb77".to_string()),
             metadata: HashMap::new(),

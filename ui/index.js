@@ -1,4 +1,4 @@
-// @introspection/ui - Shared component library for viewer apps
+// @yggdrasil/ui - Shared component library for viewer apps
 export { default as Button } from './components/Button.svelte';
 export { default as Badge } from './components/Badge.svelte';
 export { default as Input } from './components/Input.svelte';

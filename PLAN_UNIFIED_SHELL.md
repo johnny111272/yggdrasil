@@ -4,14 +4,14 @@
 
 **READ THESE FILES to understand the current state before making changes:**
 
-- This plan: `introspection/PLAN_UNIFIED_SHELL.md`
-- Workspace root: `introspection/Cargo.toml` (once created)
-- Each app's core crate: `introspection/core/*/src/lib.rs`
-- Each app's Tauri shell: `introspection/*/src-tauri/src/lib.rs`
-- Yggdrasil's Tauri shell: `introspection/yggdrasil/src-tauri/src/lib.rs`
-- Frontend views: `introspection/*/src/lib/*View.svelte`
-- Yggdrasil page: `introspection/yggdrasil/src/routes/+page.svelte`
-- Shared UI: `introspection/ui/` (components + CSS tokens)
+- This plan: `PLAN_UNIFIED_SHELL.md`
+- Workspace root: `Cargo.toml`
+- Each app's core crate: `core/*/src/lib.rs`
+- Each app's Tauri shell: `*/src-tauri/src/lib.rs`
+- Yggdrasil's Tauri shell: `yggdrasil/src-tauri/src/lib.rs`
+- Frontend views: `*/src/lib/*View.svelte`
+- Yggdrasil page: `yggdrasil/src/routes/+page.svelte`
+- Shared UI: `ui/` (components + CSS tokens)
 
 **Key constraints:**
 - Global gitignore at `~/.config/git/ignore` line 43 excludes `lib/`.
@@ -27,17 +27,17 @@ views, with a vertical right-edge tab strip showing full app names. Each app
 also continues to work as a standalone Tauri binary.
 
 All five apps share a single Cargo workspace and build target directory.
-Deployment is via symlinks from `/Applications/` to the build output.
+Deployment copies `.app` bundles to `/Applications/`.
 
 ## Tech Stack
 
 - **Tauri 2.x** — Rust backend + webview frontend
 - **Svelte 5** — runes (`$state`, `$derived`, `$props`), snippets (`{#snippet}`, `{@render}`)
 - **SvelteKit** — static adapter, `src/routes/+page.svelte` entry point
-- **@introspection/ui** — shared Svelte component library (SidebarLayout, Button, ListItem, tokens.css, base.css)
+- **@yggdrasil/ui** — shared Svelte component library (SidebarLayout, Button, ListItem, tokens.css, base.css)
 - **Cargo workspace** — shared `target/` directory, workspace dependencies
-- **Build**: `cd introspection/<app> && npm run tauri build`
-- **Deploy**: symlinks from `/Applications/<App>.app` to `introspection/target/release/bundle/macos/<app>.app`
+- **Build**: `cd <app> && npm run tauri build`
+- **Deploy**: `deploy_apps.sh` — builds all 5 apps, copies .app bundles to /Applications
 
 ## The Four Apps
 
@@ -45,7 +45,7 @@ Deployment is via symlinks from `/Applications/` to the build output.
 |-----|--------|------------|--------------------------------------|
 | H   | hlid_  | Hlidskjalf | Real-time agent activity monitor     |
 | S   | sval_  | Svalinn    | Code quality viewer (saga/gleipnir)  |
-| K   | kvas_  | Kvasir     | Workspace inspector + schema inspect |
+| K   | kvas_  | Kvasir     | Workspace inspector + format convert |
 | R   | rata_  | Ratatoskr  | Graph viewer with D3 visualization   |
 
 Tab order: H / S / K / R (top to bottom, full names spelled vertically).
@@ -55,65 +55,68 @@ Tab order: H / S / K / R (top to bottom, full names spelled vertically).
 ### Directory Structure
 
 ```
-introspection/
-  Cargo.toml                    # Workspace root
+yggdrasil/                        # Workspace root (~/.ai/smidja/yggdrasil/)
+  Cargo.toml                      # Workspace root
   .cargo/
-    config.toml                 # target-dir = "target"
-  target/                       # ALL builds land here (shared)
-    release/bundle/macos/       # .app bundles
+    config.toml                   # build target = aarch64-apple-darwin
+  target/                         # ALL builds land here (shared)
+    release/bundle/macos/         # .app bundles
 
-  core/                         # Backend library crates (NO Tauri dependency)
-    hlidskjalf_core/            # Socket listener, HookEvent struct
-      Cargo.toml                # deps: tokio, serde, serde_json
+  core/                           # Backend library crates (NO Tauri dependency)
+    common_core/                  # Shared utilities used by 2+ core crates
+      Cargo.toml                  # no deps (just std)
+      src/lib.rs                  # open_in_editor()
+    hlidskjalf_core/              # Socket listener, datagram parsing, lockfiles, voice
+      Cargo.toml                  # deps: socket_emit, tokio, serde, serde_json, dirs
+      src/lib.rs                  # re-exports Datagram/DatagramKind/Priority from socket_emit
+    svalinn_core/                 # QA sidecar scanning, saga runner
+      Cargo.toml                  # deps: common_core, serde, serde_json, glob, dirs
       src/lib.rs
-    svalinn_core/               # Sidecar scanning, Issue structs, saga runner
-      Cargo.toml                # deps: serde, serde_json, glob, dirs
+    kvasir_core/                  # File browsing, format conversion
+      Cargo.toml                  # deps: common_core, serde, serde_json, serde_yaml, toml, serde_toon2
       src/lib.rs
-    kvasir_core/                # File browsing, format conversion, language detect
-      Cargo.toml                # deps: serde, serde_json, serde_yaml, toml, serde_toon2
-      src/lib.rs
-    ratatoskr_core/             # Graph loading, JSON-LD parsing, merge config
-      Cargo.toml                # deps: serde, serde_json
+    ratatoskr_core/               # Graph loading, JSON-LD parsing, merge config
+      Cargo.toml                  # deps: serde, serde_json
       src/lib.rs
 
-  hlidskjalf/                   # Standalone Tauri app
+  hlidskjalf/                     # Standalone Tauri app
     package.json
     svelte.config.js
     vite.config.js
     src/
       lib/
-        HlidskjalfView.svelte   # All UI logic (git add -f required)
-        GleipnirReport.svelte   # Gleipnir/syn report renderer
+        HlidskjalfView.svelte     # Event feed UI (git add -f required)
+        GleipnirReport.svelte     # Gleipnir/syn report renderer
       routes/
-        +page.svelte            # Thin wrapper: <HlidskjalfView />
+        +page.svelte              # Thin wrapper: <HlidskjalfView />
     src-tauri/
-      Cargo.toml                # deps: hlidskjalf_core, tauri, tauri-plugin-*
+      Cargo.toml                  # deps: hlidskjalf_core, tauri, tauri-plugin-*
       tauri.conf.json
       build.rs
       src/
-        main.rs                 # hlidskjalf_lib::run()
-        lib.rs                  # Thin: #[tauri::command] wrappers + run()
+        main.rs                   # hlidskjalf_lib::run()
+        lib.rs                    # Thin: #[tauri::command] wrappers + run()
 
-  svalinn/                      # Same pattern as hlidskjalf
-  kvasir/                       # Same pattern (+ SchemaInspector, schema-inspect.ts)
-  ratatoskr/                    # Same pattern
+  svalinn/                        # Same pattern as hlidskjalf
+  kvasir/                         # Same pattern (+ SchemaInspector, schema-inspect.ts)
+  ratatoskr/                      # Same pattern
 
-  yggdrasil/                    # Unified shell
-    package.json                # deps include d3, highlight.js, marked
+  yggdrasil/                      # Unified shell
+    package.json
     svelte.config.js
-    vite.config.js              # Vite aliases: $hlidskjalf, $svalinn, $kvasir, $ratatoskr
+    vite.config.js                # Vite aliases: $hlidskjalf, $svalinn, $kvasir, $ratatoskr
     src/
       routes/
-        +page.svelte            # Imports all 4 views, tab strip, command maps
+        +page.svelte              # Imports all 4 views, tab strip, command maps
     src-tauri/
-      Cargo.toml                # deps: ALL 4 core crates, tauri, tauri-plugin-*
+      Cargo.toml                  # deps: ALL 4 core crates, tauri, tauri-plugin-*
       tauri.conf.json
       build.rs
       src/
-        main.rs                 # yggdrasil_lib::run()
-        lib.rs                  # ALL commands registered with prefixed names
+        main.rs                   # yggdrasil_lib::run()
+        lib.rs                    # ALL commands registered with prefixed names
 
-  ui/                           # Shared Svelte component library (unchanged)
+  ui/                             # Shared Svelte component library (@yggdrasil/ui)
     components/
     css/
 ```
@@ -135,7 +138,7 @@ introspection/
 ```rust
 // core/svalinn_core/src/lib.rs
 pub fn scan_directory(directory: &str, include_tests: bool) -> Result<ScanResult, String> { ... }
-pub fn list_directory(directory: &str) -> Result<Vec<SvalFileTreeEntry>, String> { ... }
+pub fn list_qa_tree(directory: &str) -> Result<Vec<SvalFileTreeEntry>, String> { ... }
 
 // svalinn/src-tauri/src/lib.rs
 use svalinn_core::*;
@@ -147,26 +150,42 @@ fn scan_directory(directory: String, include_tests: bool) -> Result<ScanResult, 
 ```
 
 **Hlidskjalf special case** — the socket listener needs async + event emission.
-Core provides the listener with a channel; the Tauri layer bridges to app events:
+Core provides `start_all()` which orchestrates the full startup sequence.
+The Tauri layer bridges the channel to app events:
 ```rust
 // core/hlidskjalf_core/src/lib.rs
-pub async fn start_listener(
-    sender: tokio::sync::mpsc::UnboundedSender<HookEvent>
+pub async fn start_all(
+    sender: tokio::sync::mpsc::UnboundedSender<Datagram>
 ) -> Result<(), String> { ... }
+// Internally: rotate_log, init_lockfiles, listen_and_emit, start_lockfile_monitor
 
 // hlidskjalf/src-tauri/src/lib.rs
 #[tauri::command]
-async fn start_listener(app: tauri::AppHandle) -> Result<(), String> {
+async fn start_monitor(app: tauri::AppHandle) -> Result<(), String> {
     let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
-    hlidskjalf_core::start_listener(tx).await?;
+    hlidskjalf_core::start_all(tx).await?;
     tokio::spawn(async move {
         while let Some(event) = rx.recv().await {
-            let _ = app.emit("hook-event", &event);
+            let _ = app.emit("datagram", &event);
         }
     });
     Ok(())
 }
 ```
+
+### Datagram Protocol
+
+The `Datagram` struct is defined in nornir's `socket_emit` crate and imported via cross-repo path dependency. `hlidskjalf_core` re-exports it:
+
+```rust
+pub use socket_emit::{Datagram, DatagramKind, Priority};
+```
+
+`DatagramKind` and `Priority` are enums (not strings):
+- `DatagramKind`: Alert, Report, Canary, Notify, Exchange
+- `Priority`: Trace, Low, Normal, High, Critical (with PartialOrd, Ord)
+
+Wire format uses `#[serde(rename_all = "lowercase")]` so JSON remains `"alert"`, `"critical"`, etc.
 
 ## Command Naming Convention
 
@@ -176,12 +195,12 @@ traces to its origin by name.
 
 ### Prefixes
 
-| App        | Prefix | Applied to all its commands |
-|------------|--------|-----------------------------|
-| Hlidskjalf | hlid_  | hlid_start_listener         |
-| Svalinn    | sval_  | sval_scan_directory, sval_list_directory, sval_open_in_editor, sval_run_saga |
-| Kvasir     | kvas_  | kvas_list_directory, kvas_read_file, kvas_open_in_editor, kvas_convert_all_formats, kvas_is_data_file |
-| Ratatoskr  | rata_  | rata_load_graph, rata_save_graph, rata_get_graph_stats, rata_generate_sample_graph |
+| App        | Prefix | Commands |
+|------------|--------|----------|
+| Hlidskjalf | hlid_  | `hlid_start_monitor`, `hlid_speak` |
+| Svalinn    | sval_  | `sval_scan_directory`, `sval_list_qa_tree`, `sval_open_in_editor`, `sval_run_saga` |
+| Kvasir     | kvas_  | `kvas_list_directory`, `kvas_read_file`, `kvas_open_in_editor`, `kvas_convert_to_all_formats`, `kvas_detect_data_format` |
+| Ratatoskr  | rata_  | `rata_load_graph`, `rata_save_graph`, `rata_get_graph_stats`, `rata_generate_sample_graph` |
 
 ### Frontend Command Maps
 
@@ -194,7 +213,7 @@ for standalone use.
 let {
   commands = {
     scan_directory: "scan_directory",
-    list_directory: "list_directory",
+    list_qa_tree: "list_qa_tree",
     open_in_editor: "open_in_editor",
     run_saga: "run_saga",
   }
@@ -208,7 +227,7 @@ Yggdrasil passes prefixed versions:
 ```svelte
 <SvalinnView commands={{
   scan_directory: "sval_scan_directory",
-  list_directory: "sval_list_directory",
+  list_qa_tree: "sval_list_qa_tree",
   open_in_editor: "sval_open_in_editor",
   run_saga: "sval_run_saga",
 }} />
@@ -222,6 +241,7 @@ Yggdrasil passes prefixed versions:
 [workspace]
 resolver = "2"
 members = [
+    "core/common_core",
     "core/hlidskjalf_core",
     "core/svalinn_core",
     "core/kvasir_core",
@@ -234,6 +254,7 @@ members = [
 ]
 
 [workspace.dependencies]
+socket_emit = { path = "../nornir/capability/socket_emit" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 serde_yaml = "0.9"
@@ -241,41 +262,27 @@ toml = "0.8"
 serde_toon2 = "0.1"
 glob = "0.3"
 dirs = "5"
-tokio = { version = "1", features = ["net", "io-util", "rt-multi-thread", "sync"] }
+tokio = { version = "1", features = ["net", "io-util", "rt-multi-thread", "sync", "time"] }
 tauri = { version = "2", features = [] }
 tauri-build = { version = "2", features = [] }
 tauri-plugin-opener = "2"
 tauri-plugin-dialog = "2"
 ```
 
-### .cargo/config.toml
-
-```toml
-[build]
-target-dir = "target"
-```
-
 ### Build & Deploy
 
 ```bash
 # Build one standalone app
-cd introspection/kvasir && npm run tauri build
+cd kvasir && npm run tauri build
 
 # Build yggdrasil (compiles all 4 cores + yggdrasil shell)
-cd introspection/yggdrasil && npm run tauri build
+cd yggdrasil && npm run tauri build
 
 # All share target/ — incremental builds are fast after first compile
 
-# Deploy (one-time symlink creation)
-ln -sf /Users/johnny/.ai/introspection/target/release/bundle/macos/hlidskjalf.app /Applications/Hlidskjalf.app
-ln -sf /Users/johnny/.ai/introspection/target/release/bundle/macos/svalinn.app /Applications/Svalinn.app
-ln -sf /Users/johnny/.ai/introspection/target/release/bundle/macos/kvasir.app /Applications/Kvasir.app
-ln -sf /Users/johnny/.ai/introspection/target/release/bundle/macos/ratatoskr.app /Applications/Ratatoskr.app
-ln -sf /Users/johnny/.ai/introspection/target/release/bundle/macos/yggdrasil.app /Applications/Yggdrasil.app
+# Deploy all 5 apps
+./deploy_apps.sh
 ```
-
-After symlinks exist, every `npm run tauri build` automatically updates
-what's in `/Applications/`. No copying.
 
 ## Data Format Reference
 
@@ -314,17 +321,16 @@ ruff/basedpyright issues. Backend structs use `Option<String>` with
 
 ### Syn Report Format (Hlidskjalf payload)
 
-Syn groups issues and sends them via Unix socket as hook events:
+Syn groups issues and sends them via Unix socket as datagrams:
 
 ```json
 {
   "timestamp": 1646064000.0,
-  "category": "quality",
-  "decision": "allow|warn|deny",
-  "event_name": "syn_check",
+  "source": "syn",
+  "type": "report",
+  "priority": "normal",
   "workspace": "bragi",
   "detail": "7 issues, 0 deny",
-  "context_injected": "",
   "payload": {
     "type": "gleipnir_report|syn_report",
     "total": 7,
@@ -352,8 +358,8 @@ details. HlidskjalfView discriminates on `payload.type`.
 
 ### Voice Level
 
-Voice level (0=silent, 1=deny, 2=all) is **purely frontend state** in
-HlidskjalfView. It controls which events trigger a voice prompt.
+Voice level is **purely frontend state** in HlidskjalfView (`speechMinPriority`).
+It controls which events trigger a voice prompt.
 It does NOT filter events — all events are always displayed. There is
 NO backend command for voice level.
 
@@ -403,21 +409,3 @@ state persists across tab switches.
 - `src/lib/` files are hidden by global gitignore — always `git add -f`
 - Tauri's `generate_context!()` macro needs `tauri.conf.json` at a path
   relative to the crate's `Cargo.toml` — workspace layout must preserve this
-
-## Implementation Tasks
-
-See task list in the current session. If no task list exists, create one
-from the phases below:
-
-1. Create workspace Cargo.toml and .cargo/config.toml
-2. Extract hlidskjalf_core from hlidskjalf/src-tauri/src/lib.rs
-3. Extract svalinn_core from svalinn/src-tauri/src/lib.rs
-4. Extract kvasir_core from kvasir/src-tauri/src/lib.rs
-5. Extract ratatoskr_core from ratatoskr/src-tauri/src/lib.rs
-6. Slim each app's src-tauri/src/lib.rs to Tauri wrappers
-7. Rewrite yggdrasil/src-tauri/src/lib.rs to import from cores
-8. Add command map props to all 4 view components
-9. Update yggdrasil +page.svelte to pass prefixed command maps
-10. Verify all 5 apps build
-11. Create /Applications symlinks
-12. Commit

@@ -215,15 +215,21 @@ Fixed-severity senders can be whitelisted in Claude Code hook config as always-a
 
 Subagents get a restricted set. Main LLM sessions may get more. You control the envelope per context.
 
-## Implementation Order
+## Implementation Status
 
-_Rough sequencing, not commitments:_
+### Completed
 
-1. Standardize datagram format — update `socket_emit::WatchtowerEvent` and `hlidskjalf_core::HookEvent`
-2. Rolling `.jsonl` log — write on receive in hlidskjalf_core
-3. Sender binaries — `send_heartbeat`, `send_notification`, `send_warning`, `send_alert`, `send_datagram`
-4. Kill switch — lockfile checks in hook_io
-5. Syn escalation — count in log, touch `SYN.lock`
-6. Canary infrastructure — emit from system prompt sections, display in status bar
-7. Display filtering UI — source/type/priority toggles
-8. Priority level refinement — analyze log patterns, adjust levels
+1. Datagram format standardized — `Datagram` struct with typed `DatagramKind` and `Priority` enums in nornir's `socket_emit`
+2. `hlidskjalf_core` imports from `socket_emit` via cross-repo path dependency
+3. Rolling `.jsonl` log — write on receive in hlidskjalf_core
+4. Sender binaries — `send_heartbeat`, `send_notification`, `send_warning`, `send_alert`, `send_datagram` (all using typed enums)
+5. Kill switch — lockfile checks via `init_lockfiles` + `start_lockfile_monitor` in hlidskjalf_core
+6. Display filtering UI — type filter + priority threshold in HlidskjalfView
+7. Speech threshold — cyclable in HlidskjalfView frontend
+
+### Remaining
+
+- Syn escalation — count in log, touch `SYN.lock`
+- Canary infrastructure — emit from system prompt sections, display in status bar
+- Priority level refinement — analyze log patterns, adjust levels
+- Migrate all emitters from `HookEvent` to native `Datagram` format

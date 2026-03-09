@@ -16,13 +16,13 @@ fn open_in_editor(path: String, line: usize) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn convert_all_formats(content: String, source_format: String) -> Result<AllFormats, String> {
-    kvasir_core::convert_all_formats(&content, &source_format)
+fn convert_to_all_formats(content: String, source_format: String) -> Result<AllFormats, String> {
+    kvasir_core::convert_to_all_formats(&content, &source_format)
 }
 
 #[tauri::command]
-fn is_data_file(path: String) -> Option<String> {
-    kvasir_core::is_data_file(&path)
+fn detect_data_format(path: String) -> Option<String> {
+    kvasir_core::detect_data_format(&path)
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -30,7 +30,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
-        .invoke_handler(tauri::generate_handler![list_directory, read_file, open_in_editor, convert_all_formats, is_data_file])
+        .invoke_handler(tauri::generate_handler![list_directory, read_file, open_in_editor, convert_to_all_formats, detect_data_format])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

@@ -1,7 +1,7 @@
 <script lang="ts">
   interface Props {
     count: number;
-    severity?: "blocked" | "error" | "warning" | "info" | "neutral";
+    severity?: "blocked" | "error" | "warning" | "success" | "neutral";
   }
 
   let { count, severity = "neutral" }: Props = $props();
@@ -11,7 +11,7 @@
       case "blocked": return "var(--severity-blocked)";
       case "error": return "var(--severity-error)";
       case "warning": return "var(--severity-warning)";
-      case "info": return "var(--severity-info)";
+      case "success": return "var(--severity-success)";
       default: return "var(--action-primary)";
     }
   }

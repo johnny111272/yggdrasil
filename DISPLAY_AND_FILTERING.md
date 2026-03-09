@@ -214,8 +214,8 @@ Updated enum: `["alert", "report", "canary", "notify", "exchange"]`
 
 This requires updating:
 - `schemas/datagram.schema.json` — add "exchange" to the type enum
-- `hlidskjalf_core` Datagram struct — no change needed (type field is already String)
-- `HlidskjalfView.svelte` — add "exchange" to type_icon mapping, add renderer for exchange_diff payloads
+- nornir `socket_emit` — add `Exchange` variant to `DatagramKind` enum (already present)
+- `HlidskjalfView.svelte` — add "exchange" to `typeIcon` mapping, add renderer for exchange_diff payloads
 - New component: `ExchangeDiffReport.svelte` — renderer for exchange_diff payloads (parallel to GleipnirReport.svelte)
 
 ---

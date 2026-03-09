@@ -18,14 +18,14 @@
   <div class="view-area">
     <div class="view-pane" class:active={activeTab === "hlidskjalf"}>
       <HlidskjalfView commands={{
-        start_listener: "hlid_start_listener",
+        start_monitor: "hlid_start_monitor",
         speak: "hlid_speak",
       }} />
     </div>
     <div class="view-pane" class:active={activeTab === "svalinn"}>
       <SvalinnView commands={{
         scan_directory: "sval_scan_directory",
-        list_directory: "sval_list_directory",
+        list_qa_tree: "sval_list_qa_tree",
         open_in_editor: "sval_open_in_editor",
         run_saga: "sval_run_saga",
       }} />
@@ -35,8 +35,8 @@
         list_directory: "kvas_list_directory",
         read_file: "kvas_read_file",
         open_in_editor: "kvas_open_in_editor",
-        convert_all_formats: "kvas_convert_all_formats",
-        is_data_file: "kvas_is_data_file",
+        convert_to_all_formats: "kvas_convert_to_all_formats",
+        detect_data_format: "kvas_detect_data_format",
       }} />
     </div>
     <div class="view-pane" class:active={activeTab === "ratatoskr"}>

@@ -282,24 +282,21 @@ Hlidskjalf has a dedicated renderer for this payload type (the existing `Gleipni
 | `~/.ai/hlidskjalf/KILL.lock` | Must not exist — presence blocks everything |
 | `{workspace}/.ai/SYN.lock` | Presence triggers full workspace syn scan |
 
-## Migration Path
+## Implementation Status
 
-### Phase 1: New schema, backward compatible
+### Completed
 
-- Define `datagram.schema.json` in nornir schemas
-- Create `socket_emit_v2` or update `socket_emit` to emit new format
-- Update `hlidskjalf_core::HookEvent` to accept both old and new format (serde `#[serde(alias)]` or try-parse fallback)
-- Build sender binaries against new schema
+- `Datagram` struct with typed `DatagramKind` and `Priority` enums lives in nornir's `socket_emit` crate
+- `hlidskjalf_core` re-exports `Datagram`, `DatagramKind`, `Priority` from `socket_emit` (cross-repo path dep)
+- Legacy `HookEvent` format accepted via `From<HookEvent> for Datagram` conversion
+- All nornir sender binaries (`send_alert`, `send_warning`, `send_notification`, `send_heartbeat`, `send_datagram`) updated to use typed enums
+- Rolling `.jsonl` log in hlidskjalf_core
+- Lockfile monitoring in hlidskjalf_core
+- Display filtering in HlidskjalfView (type + priority threshold)
+- Speech threshold UI in HlidskjalfView
 
-### Phase 2: Update all emitters
+### Remaining
 
-- Migrate `hook_io` to emit new format
-- Migrate syn broadcast to emit new format
-- Remove old `WatchtowerEvent` struct
-
-### Phase 3: Receiver features
-
-- Rolling log in hlidskjalf_core
-- Lockfile monitoring
-- Display filtering in Svelte
-- Speech threshold UI
+- Add `"exchange"` to the `type` enum in `datagram.schema.json` and `DatagramKind` in socket_emit
+- Migrate `hook_io` and `syn` to emit new datagram format natively (currently still emit HookEvent, converted on receive)
+- Remove old `WatchtowerEvent` / `HookEvent` once all emitters are migrated

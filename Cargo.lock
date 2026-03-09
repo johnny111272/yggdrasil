@@ -452,6 +452,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "common_core"
+version = "0.1.0"
+
+[[package]]
 name = "concurrent-queue"
 version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1876,12 +1880,12 @@ dependencies = [
 name = "kvasir_core"
 version = "0.1.0"
 dependencies = [
+ "common_core",
  "serde",
  "serde_json",
  "serde_toon2",
  "serde_yaml",
  "toml 0.8.2",
- "yggdrasil_shared",
 ]
 
 [[package]]
@@ -3437,11 +3441,11 @@ dependencies = [
 name = "svalinn_core"
 version = "0.1.0"
 dependencies = [
+ "common_core",
  "dirs 5.0.1",
  "glob",
  "serde",
  "serde_json",
- "yggdrasil_shared",
 ]
 
 [[package]]
@@ -5306,10 +5310,6 @@ dependencies = [
  "tauri-plugin-opener",
  "tokio",
 ]
-
-[[package]]
-name = "yggdrasil_shared"
-version = "0.1.0"
 
 [[package]]
 name = "yoke"

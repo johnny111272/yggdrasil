@@ -1,6 +1,6 @@
 # Kvasir - Workspace Inspector
 
-**Kvasir** (Norse: the wisest being, whose knowledge was distilled into the mead of poetry) is a desktop workspace inspector for exploring codebases with syntax highlighting and data visualization.
+**Kvasir** (Norse: the wisest being, whose knowledge was distilled into the mead of poetry) is a desktop workspace inspector for exploring codebases with syntax highlighting, format conversion, and schema inspection.
 
 ## Architecture
 
@@ -12,10 +12,9 @@
 │  ─────────────────────         │  ────────────────          │
 │  • Directory tree view         │  • list_directory()        │
 │  • Code viewer (highlight.js)  │  • read_file()             │
-│  • JSON/YAML viewer            │  • detect_language()       │
-│  • Markdown preview            │  • get_file_stats()        │
-│  • Token counting              │                            │
-│  • Dotfile toggle              │                            │
+│  • Format converter            │  • convert_to_all_formats()│
+│  • Schema inspector            │  • detect_data_format()    │
+│  • Dotfile toggle              │  • open_in_editor()        │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -23,46 +22,44 @@
 
 - **Tauri 2.x**: Rust backend + system webview
 - **Svelte 5**: Frontend with runes ($state, $derived)
-- **@introspection/ui**: Shared component library
+- **@yggdrasil/ui**: Shared component library
 - **highlight.js**: Syntax highlighting
 
 ## Key Files
 
 ```
-~/.ai/introspection/kvasir/
+kvasir/
 ├── src/
+│   └── lib/
+│       ├── KvasirView.svelte       # Main UI (git add -f required)
+│       ├── SchemaInspector.svelte   # JSON Schema analysis renderer
+│       └── schema-inspect.ts       # Pure schema analysis functions
 │   └── routes/
-│       └── +page.svelte      # Main UI (tree + viewer)
+│       └── +page.svelte            # Thin wrapper: <KvasirView />
 ├── src-tauri/
 │   ├── src/
-│   │   └── lib.rs            # Rust backend (file ops)
-│   ├── Cargo.toml            # Rust dependencies
+│   │   ├── main.rs                 # kvasir_lib::run()
+│   │   └── lib.rs                  # Tauri wrappers
+│   ├── Cargo.toml                  # deps: kvasir_core, common_core, tauri
 │   └── capabilities/
-│       └── default.json      # Tauri permissions
-├── package.json              # Node dependencies
-└── OUTLINE.md                # This file
+│       └── default.json            # Tauri permissions
+├── package.json
+└── OUTLINE.md
 ```
 
-## Running
+## Commands
 
-```bash
-cd ~/.ai/introspection/kvasir
-npm run tauri dev
-```
-
-## Features
-
-| Feature | Description |
-|---------|-------------|
-| Tree navigation | Expandable directory tree with file icons |
-| Code viewing | Syntax-highlighted code with line numbers |
-| Data viewing | Pretty-printed JSON/YAML/TOML |
-| Markdown | Rendered markdown preview |
-| Token count | Approximate token count for LLM context |
-| Dotfile toggle | Show/hide hidden files and directories |
+| Standalone | Yggdrasil (prefixed) | Description |
+|-----------|---------------------|-------------|
+| `list_directory` | `kvas_list_directory` | List directory contents |
+| `read_file` | `kvas_read_file` | Read file with language detection |
+| `open_in_editor` | `kvas_open_in_editor` | Open file in VS Code |
+| `convert_to_all_formats` | `kvas_convert_to_all_formats` | Convert between JSON/YAML/TOML/TOON |
+| `detect_data_format` | `kvas_detect_data_format` | Detect data format from file extension |
 
 ## Related Apps
 
-- **Svalinn**: Code quality dashboard
+- **Hlidskjalf**: Agent monitor
+- **Svalinn**: Code quality viewer
 - **Ratatoskr**: Graph viewer
-- **@introspection/ui**: Shared components
+- **@yggdrasil/ui**: Shared components

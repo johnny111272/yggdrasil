@@ -24,31 +24,36 @@
 - **Tauri 2.x**: Rust backend + system webview
 - **Svelte 5**: Frontend with runes ($state, $derived)
 - **D3.js**: Force-directed graph visualization
-- **@introspection/ui**: Shared component library
+- **@yggdrasil/ui**: Shared component library
 
 ## Key Files
 
 ```
-~/.ai/introspection/ratatoskr/
+ratatoskr/
 ├── src/
+│   └── lib/
+│       └── RatatoskrView.svelte    # D3 graph UI (git add -f required)
 │   └── routes/
-│       └── +page.svelte      # D3 graph UI
+│       └── +page.svelte            # Thin wrapper: <RatatoskrView />
 ├── src-tauri/
 │   ├── src/
-│   │   └── lib.rs            # Rust backend (JSON-LD, graph ops)
-│   ├── Cargo.toml            # Rust dependencies
+│   │   ├── main.rs                 # ratatoskr_lib::run()
+│   │   └── lib.rs                  # Tauri wrappers
+│   ├── Cargo.toml                  # deps: ratatoskr_core, tauri
 │   └── capabilities/
-│       └── default.json      # Tauri permissions
-├── package.json              # Node dependencies
-└── OVERVIEW.md               # This file
+│       └── default.json            # Tauri permissions
+├── package.json
+└── OUTLINE.md
 ```
 
-## Running
+## Commands
 
-```bash
-cd ~/.ai/introspection/ratatoskr
-npm run tauri dev
-```
+| Standalone | Yggdrasil (prefixed) | Description |
+|-----------|---------------------|-------------|
+| `load_graph` | `rata_load_graph` | Load JSON-LD graph from file |
+| `save_graph` | `rata_save_graph` | Save graph to file |
+| `get_graph_stats` | `rata_get_graph_stats` | Get node/edge counts |
+| `generate_sample_graph` | `rata_generate_sample_graph` | Generate demo graph |
 
 ## JSON-LD Support
 
@@ -66,35 +71,19 @@ When loading files with references, use these fields:
 
 ```json
 {
-  "join_on": "APPLICATION",     // Shared node (not prefixed)
-  "prefix": "West: ",           // Prefix for other nodes
-  "color": "#ff4444",           // Default color for unmatched nodes
-  "stylesheet": {               // Label → color mapping
+  "join_on": "APPLICATION",
+  "prefix": "West: ",
+  "color": "#ff4444",
+  "stylesheet": {
     "APPLICATION": "#4169e1",
     "COMMAND GATE": "#ffd700"
   }
 }
 ```
 
-**Color priority:**
-1. Stylesheet match (exact label)
-2. Gate default (`color` field)
-3. Type-based fallback
-
-## Features
-
-| Feature | Description |
-|---------|-------------|
-| Force layout | D3 force-directed positioning |
-| Zoom/pan | Mouse wheel + drag on background |
-| Node drag | Drag nodes to reposition |
-| Selection | Click nodes to see details |
-| Stylesheet | JSON-LD defined node colors |
-| Reference resolution | Load linked documents |
-| Graph merging | Combine multiple graphs with shared nodes |
-
 ## Related Apps
 
-- **Svalinn**: Code quality dashboard
-- **Hlidskjalf**: File viewer
-- **@introspection/ui**: Shared components
+- **Hlidskjalf**: Agent monitor
+- **Svalinn**: Code quality viewer
+- **Kvasir**: Workspace inspector
+- **@yggdrasil/ui**: Shared components
