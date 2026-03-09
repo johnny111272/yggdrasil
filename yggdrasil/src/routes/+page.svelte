@@ -3,20 +3,23 @@
   import SvalinnView from "$svalinn/SvalinnView.svelte";
   import KvasirView from "$kvasir/KvasirView.svelte";
   import RatatoskrView from "$ratatoskr/RatatoskrView.svelte";
+  import { invoke } from "@tauri-apps/api/core";
+  import { listen } from "@tauri-apps/api/event";
+  import { onMount } from "svelte";
 
   let activeTab = $state("hlidskjalf");
   let mounted = $state(new Set(["hlidskjalf"]));
+  let openFilePath: string | null = $state(null);
 
   function selectTab(id: string) {
-    mounted.add(id);
+    mounted = new Set([...mounted, id]);
     activeTab = id;
   }
 
   function clearDormant() {
-    for (const id of [...mounted]) {
-      if (id !== "hlidskjalf") mounted.delete(id);
-    }
+    mounted = new Set(["hlidskjalf"]);
     activeTab = "hlidskjalf";
+    openFilePath = null;
   }
 
   const tabs = [
@@ -27,6 +30,21 @@
   ];
 
   let hasDormant = $derived(mounted.size > 1);
+
+  onMount(async () => {
+    const pending = await invoke<string | null>("get_pending_file");
+    if (pending) {
+      selectTab("kvasir");
+      openFilePath = pending;
+    }
+
+    const unlisten = await listen<string>("open-file", (event) => {
+      selectTab("kvasir");
+      openFilePath = event.payload;
+    });
+
+    return unlisten;
+  });
 </script>
 
 <div class="shell">
@@ -55,7 +73,7 @@
           open_in_editor: "kvas_open_in_editor",
           convert_to_all_formats: "kvas_convert_to_all_formats",
           detect_data_format: "kvas_detect_data_format",
-        }} />
+        }} openFile={openFilePath} />
       </div>
     {/if}
     {#if mounted.has("ratatoskr")}
@@ -124,7 +142,7 @@
   }
 
   .tab-strip {
-    width: 22px;
+    width: 28px;
     background: var(--bg-secondary);
     border-left: 1px solid var(--border-default);
     display: flex;
@@ -142,7 +160,7 @@
     background: transparent;
     color: var(--text-secondary);
     font-family: var(--font-mono);
-    font-size: 0.5625rem;
+    font-size: 0.75rem;
     font-weight: 500;
     letter-spacing: 0.05em;
     cursor: pointer;
@@ -157,8 +175,8 @@
 
   .tab-char {
     display: block;
-    height: 0.75rem;
-    line-height: 0.75rem;
+    height: 0.9rem;
+    line-height: 0.9rem;
   }
 
   .tab-btn:hover {

@@ -101,9 +101,7 @@ pub fn read_file(path: &str) -> Result<FileContent, String> {
         return Err(format!("Not a file: {}", path));
     }
 
-    let extension = file_path.extension()
-        .map(|e| e.to_string_lossy().to_lowercase())
-        .unwrap_or_default();
+    let extension = effective_extension(file_path);
 
     let binary_extensions = ["png", "jpg", "jpeg", "gif", "ico", "pdf", "zip", "tar", "gz",
                             "exe", "dll", "so", "dylib", "pyc", "pyo", "wasm", "bin"];
@@ -187,10 +185,10 @@ pub fn convert_to_all_formats(content: &str, source_format: &str) -> Result<AllF
 }
 
 pub fn detect_data_format(path: &str) -> Option<String> {
-    let path = Path::new(path);
-    let ext = path.extension()?.to_string_lossy().to_lowercase();
+    let file_path = Path::new(path);
+    let ext = effective_extension(file_path);
     match ext.as_str() {
-        "json" | "jsonld" | "qa" => Some("json".to_string()),
+        "json" | "jsonld" | "qa" | "meta" | "index" => Some("json".to_string()),
         "yaml" | "yml" => Some("yaml".to_string()),
         "toml" => Some("toml".to_string()),
         "toon" => Some("toon".to_string()),
@@ -201,6 +199,20 @@ pub fn detect_data_format(path: &str) -> Option<String> {
 // ============================================================================
 // Internal Helpers
 // ============================================================================
+
+fn effective_extension(path: &Path) -> String {
+    let ext = path.extension()
+        .map(|e| e.to_string_lossy().to_lowercase())
+        .unwrap_or_default();
+    if ext == "bak" {
+        Path::new(path.file_stem().unwrap_or_default())
+            .extension()
+            .map(|e| e.to_string_lossy().to_lowercase())
+            .unwrap_or_default()
+    } else {
+        ext
+    }
+}
 
 fn estimate_token_count(content: &str) -> usize {
     content.len() / 4
@@ -219,7 +231,7 @@ fn detect_language(extension: &str) -> String {
         "css" => "css",
         "scss" => "scss",
         "less" => "less",
-        "json" | "jsonld" | "qa" => "json",
+        "json" | "jsonld" | "qa" | "meta" | "index" => "json",
         "yaml" | "yml" => "yaml",
         "toml" => "toml",
         "md" | "markdown" => "markdown",

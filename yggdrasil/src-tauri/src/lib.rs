@@ -1,4 +1,8 @@
-use tauri::Emitter;
+use std::sync::Mutex;
+use tauri::{Emitter, Manager};
+
+// ── Managed state for file-open-from-OS race condition ───────────────
+struct PendingFile(Mutex<Option<String>>);
 
 // ============================================================================
 // Hlidskjalf commands (hlid_ prefix)
@@ -99,6 +103,15 @@ fn rata_generate_sample_graph() -> ratatoskr_core::GraphData {
 }
 
 // ============================================================================
+// Shell-level commands (no prefix — not app-specific)
+// ============================================================================
+
+#[tauri::command]
+fn get_pending_file(state: tauri::State<PendingFile>) -> Option<String> {
+    state.0.lock().unwrap().take()
+}
+
+// ============================================================================
 // App Entry
 // ============================================================================
 
@@ -107,7 +120,10 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        .manage(PendingFile(Mutex::new(None)))
         .invoke_handler(tauri::generate_handler![
+            // Shell
+            get_pending_file,
             // Hlidskjalf
             hlid_start_monitor,
             hlid_speak,
@@ -128,6 +144,19 @@ pub fn run() {
             rata_get_graph_stats,
             rata_generate_sample_graph,
         ])
-        .run(tauri::generate_context!())
-        .expect("Yggdrasil failed to start");
+        .build(tauri::generate_context!())
+        .expect("Yggdrasil failed to build")
+        .run(|app_handle, event| {
+            #[cfg(target_os = "macos")]
+            if let tauri::RunEvent::Opened { urls } = &event {
+                for url in urls {
+                    if let Ok(path) = url.to_file_path() {
+                        let path_str = path.to_string_lossy().to_string();
+                        *app_handle.state::<PendingFile>().0.lock().unwrap() =
+                            Some(path_str.clone());
+                        let _ = app_handle.emit("open-file", &path_str);
+                    }
+                }
+            }
+        });
 }

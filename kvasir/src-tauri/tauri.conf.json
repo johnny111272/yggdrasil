@@ -25,6 +25,27 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "fileAssociations": [
+      {
+        "ext": [
+          "json", "jsonl", "jsonld", "json-ld",
+          "yaml", "yml", "toml", "tomlx", "ron",
+          "csv", "tsv",
+          "ini", "cfg", "conf", "env",
+          "md", "txt", "rst",
+          "py", "rs", "js", "ts", "svelte", "html", "css",
+          "sh", "zsh", "bash",
+          "rb", "go", "java", "c", "cpp", "h", "hpp",
+          "swift", "lua", "sql", "zig",
+          "qa", "meta", "index",
+          "bak",
+          "log", "diff", "xml", "svg"
+        ],
+        "name": "Text File",
+        "role": "Viewer",
+        "rank": "Alternate"
+      }
+    ],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
