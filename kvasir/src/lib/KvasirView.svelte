@@ -1,10 +1,11 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
   import { open } from "@tauri-apps/plugin-dialog";
-  import { Button, SidebarLayout } from "@yggdrasil/ui";
+  import { Button, SidebarLayout, TreeNode } from "@yggdrasil/ui";
   import hljs from "highlight.js";
   import "highlight.js/styles/github-dark.css";
   import { marked } from "marked";
+  import MarkdownPreview from "./MarkdownPreview.svelte";
   import SchemaInspector from "./SchemaInspector.svelte";
   import { analyzeSchema, type InspectedSchema } from "./schema-inspect";
 
@@ -55,9 +56,9 @@
     source_format: string;
   }
 
-  interface TreeNode extends FileTreeEntry {
+  interface KvasTreeNode extends FileTreeEntry {
     expanded: boolean;
-    children: TreeNode[];
+    children: KvasTreeNode[];
     loading: boolean;
   }
 
@@ -65,7 +66,7 @@
   type DataFormat = "json" | "yaml" | "toml" | "toon";
 
   let directory = $state("");
-  let treeRoot: TreeNode | null = $state(null);
+  let treeRoot: KvasTreeNode | null = $state(null);
   let selectedFile: string | null = $state(null);
   let fileContent: FileContent | null = $state(null);
   let loading = $state(false);
@@ -118,11 +119,19 @@
     loading = false;
   }
 
-  async function toggleNode(node: TreeNode) {
-    if (!node.is_dir) {
-      await loadFile(node.path);
-      return;
+  function findNode(root: KvasTreeNode, path: string): KvasTreeNode | null {
+    if (root.path === path) return root;
+    for (const child of root.children) {
+      const found = findNode(child, path);
+      if (found) return found;
     }
+    return null;
+  }
+
+  async function handleTreeToggle(path: string) {
+    if (!treeRoot) return;
+    const node = findNode(treeRoot, path);
+    if (!node) return;
 
     if (node.expanded) {
       node.expanded = false;
@@ -144,6 +153,11 @@
       }
       node.expanded = true;
     }
+    treeRoot = treeRoot;
+  }
+
+  async function handleTreeSelect(path: string) {
+    await loadFile(path);
   }
 
   async function loadFile(path: string) {
@@ -220,12 +234,9 @@
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   }
 
-  function getIcon(node: TreeNode): string {
-    if (node.is_dir) {
-      if (node.loading) return "\u23F3";
-      return node.expanded ? "\uD83D\uDCC2" : "\uD83D\uDCC1";
-    }
-    switch (node.extension) {
+  function getFileIcon(path: string): string {
+    const ext = path.split(".").pop()?.toLowerCase();
+    switch (ext) {
       case "py": return "\uD83D\uDC0D";
       case "rs": return "\uD83E\uDD80";
       case "js":
@@ -341,27 +352,14 @@
   {/snippet}
 
   {#snippet sidebar()}
-    {#snippet renderNode(node: TreeNode, depth: number)}
-      <div
-        class="tree-node"
-        class:selected={selectedFile === node.path}
-        style="padding-left: {depth * 16 + 8}px"
-        onclick={() => toggleNode(node)}
-        onkeydown={(e) => e.key === 'Enter' && toggleNode(node)}
-        role="button"
-        tabindex="0"
-      >
-        <span class="tree-icon">{getIcon(node)}</span>
-        <span class="tree-name">{node.name}</span>
-      </div>
-      {#if node.expanded && node.children.length > 0}
-        {#each node.children as child}
-          {@render renderNode(child, depth + 1)}
-        {/each}
-      {/if}
-    {/snippet}
     {#if treeRoot}
-      {@render renderNode(treeRoot, 0)}
+      <TreeNode
+        node={treeRoot}
+        selected={selectedFile}
+        onToggle={handleTreeToggle}
+        onSelect={handleTreeSelect}
+        getIcon={getFileIcon}
+      />
     {/if}
   {/snippet}
 
@@ -486,9 +484,7 @@
         </section>
       <!-- Markdown Preview -->
       {:else if activeTab === "preview" && isMarkdownFile}
-        <section class="markdown-preview">
-          {@html renderedMarkdown}
-        </section>
+        <MarkdownPreview content={renderedMarkdown} />
       {:else}
         <section class="code-viewer">
           <pre><code>{#each displayContent.split('\n') as line, i}{@const highlighted = highlightedContent.split('\n')[i] || ''}<span class="line-number">{i + 1}</span><span class="line-content">{@html highlighted}</span>
@@ -527,37 +523,6 @@
   .dotfile-label {
     font-family: var(--font-mono);
     font-size: var(--text-xs);
-  }
-
-  .tree-node {
-    display: flex;
-    align-items: center;
-    gap: var(--space-md);
-    padding: var(--space-sm) var(--space-md);
-    cursor: pointer;
-    user-select: none;
-  }
-
-  .tree-node:hover {
-    background: var(--bg-hover);
-  }
-
-  .tree-node.selected {
-    background: var(--bg-selected);
-  }
-
-  .tree-icon {
-    font-size: var(--text-sm);
-    width: 1.25rem;
-    text-align: center;
-  }
-
-  .tree-name {
-    flex: 1;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-size: var(--text-sm);
   }
 
   header {
@@ -768,118 +733,6 @@
 
   .line-content {
     white-space: pre;
-  }
-
-  /* Markdown preview */
-  .markdown-preview {
-    background: var(--bg-secondary);
-    border-radius: var(--radius-md);
-    padding: var(--space-2xl);
-    overflow-y: auto;
-    line-height: 1.7;
-  }
-
-  .markdown-preview :global(h1),
-  .markdown-preview :global(h2),
-  .markdown-preview :global(h3),
-  .markdown-preview :global(h4) {
-    color: var(--text-primary);
-    margin-top: var(--space-2xl);
-    margin-bottom: var(--space-lg);
-  }
-
-  .markdown-preview :global(h1) {
-    font-size: var(--text-3xl);
-    border-bottom: 1px solid var(--border-default);
-    padding-bottom: var(--space-md);
-  }
-
-  .markdown-preview :global(h2) {
-    font-size: var(--text-2xl);
-    border-bottom: 1px solid var(--border-subtle);
-    padding-bottom: var(--space-sm);
-  }
-
-  .markdown-preview :global(h3) {
-    font-size: var(--text-xl);
-  }
-
-  .markdown-preview :global(p) {
-    margin-bottom: var(--space-lg);
-    color: var(--text-muted);
-  }
-
-  .markdown-preview :global(code) {
-    background: var(--bg-primary);
-    padding: var(--space-xs) var(--space-sm);
-    border-radius: var(--radius-sm);
-    font-family: var(--font-mono);
-    font-size: 0.9em;
-  }
-
-  .markdown-preview :global(pre) {
-    background: var(--bg-primary);
-    padding: var(--space-lg);
-    border-radius: var(--radius-md);
-    overflow-x: auto;
-    margin-bottom: var(--space-lg);
-  }
-
-  .markdown-preview :global(pre code) {
-    background: none;
-    padding: 0;
-  }
-
-  .markdown-preview :global(ul),
-  .markdown-preview :global(ol) {
-    margin-bottom: var(--space-lg);
-    padding-left: var(--space-2xl);
-    color: var(--text-muted);
-  }
-
-  .markdown-preview :global(li) {
-    margin-bottom: var(--space-sm);
-  }
-
-  .markdown-preview :global(blockquote) {
-    border-left: 4px solid var(--action-primary);
-    margin: var(--space-lg) 0;
-    padding: var(--space-md) var(--space-xl);
-    background: var(--bg-primary);
-    color: var(--text-secondary);
-  }
-
-  .markdown-preview :global(a) {
-    color: var(--action-primary);
-    text-decoration: none;
-  }
-
-  .markdown-preview :global(a:hover) {
-    text-decoration: underline;
-  }
-
-  .markdown-preview :global(table) {
-    width: 100%;
-    border-collapse: collapse;
-    margin-bottom: var(--space-lg);
-  }
-
-  .markdown-preview :global(th),
-  .markdown-preview :global(td) {
-    border: 1px solid var(--border-default);
-    padding: var(--space-md);
-    text-align: left;
-  }
-
-  .markdown-preview :global(th) {
-    background: var(--bg-primary);
-    font-weight: bold;
-  }
-
-  .markdown-preview :global(hr) {
-    border: none;
-    border-top: 1px solid var(--border-default);
-    margin: var(--space-2xl) 0;
   }
 
   .inspector-view {

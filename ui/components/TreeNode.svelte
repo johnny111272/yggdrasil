@@ -20,6 +20,7 @@
     onSelect?: (path: string) => void;
     getBadgeCount?: (path: string, isDir: boolean) => number;
     getBadgeSeverity?: (path: string, isDir: boolean) => string;
+    getIcon?: (path: string, isDir: boolean) => string;
   }
 
   let {
@@ -30,6 +31,7 @@
     onSelect,
     getBadgeCount,
     getBadgeSeverity,
+    getIcon: getIconProp,
   }: Props = $props();
 
   function handleClick() {
@@ -45,9 +47,12 @@
   }
 
   function getIcon(): string {
-    if (!node.is_dir) return "📄";
-    if (node.loading) return "⏳";
-    return node.expanded ? "📂" : "📁";
+    if (node.is_dir) {
+      if (node.loading) return "⏳";
+      return node.expanded ? "📂" : "📁";
+    }
+    if (getIconProp) return getIconProp(node.path, node.is_dir);
+    return "📄";
   }
 
   let count = $derived(getBadgeCount?.(node.path, node.is_dir) ?? 0);
@@ -80,6 +85,7 @@
       {onSelect}
       {getBadgeCount}
       {getBadgeSeverity}
+      getIcon={getIconProp}
     />
   {/each}
 {/if}

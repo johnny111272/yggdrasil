@@ -190,29 +190,25 @@
     }
   }
 
-  let filteredIssues = $derived.by(() => {
+  let baseFilteredIssues = $derived.by(() => {
     if (!scanResult) return [];
     let issues = scanResult.issues;
-
-    if (selectedFile) {
-      issues = issues.filter((i) => i.file === selectedFile);
-    }
-    if (severityFilter !== "All") {
-      issues = issues.filter((i) => i.severity === severityFilter);
-    }
-    if (toolFilter !== "All") {
-      issues = issues.filter((i) => i.tool === toolFilter);
-    }
+    if (severityFilter !== "All") issues = issues.filter(i => i.severity === severityFilter);
+    if (toolFilter !== "All") issues = issues.filter(i => i.tool === toolFilter);
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
-      issues = issues.filter(
-        (i) =>
-          i.file.toLowerCase().includes(q) ||
-          i.message.toLowerCase().includes(q) ||
-          i.code.toLowerCase().includes(q)
+      issues = issues.filter(i =>
+        i.file.toLowerCase().includes(q) ||
+        i.message.toLowerCase().includes(q) ||
+        i.code.toLowerCase().includes(q)
       );
     }
     return issues;
+  });
+
+  let filteredIssues = $derived.by(() => {
+    if (!selectedFile) return baseFilteredIssues;
+    return baseFilteredIssues.filter(i => i.file === selectedFile);
   });
 
   let groupedIssues = $derived.by(() => {
@@ -271,28 +267,9 @@
   };
 
   let filteredDataByPath = $derived.by(() => {
-    if (!scanResult) return { counts: new Map<string, number>(), severities: new Map<string, string>() };
-
-    let issues = scanResult.issues;
-    if (severityFilter !== "All") {
-      issues = issues.filter((i) => i.severity === severityFilter);
-    }
-    if (toolFilter !== "All") {
-      issues = issues.filter((i) => i.tool === toolFilter);
-    }
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase();
-      issues = issues.filter(
-        (i) =>
-          i.file.toLowerCase().includes(q) ||
-          i.message.toLowerCase().includes(q) ||
-          i.code.toLowerCase().includes(q)
-      );
-    }
-
     const countsByFile = new Map<string, number>();
     const maxSeverityByFile = new Map<string, string>();
-    for (const issue of issues) {
+    for (const issue of baseFilteredIssues) {
       countsByFile.set(issue.file, (countsByFile.get(issue.file) || 0) + 1);
       const current = maxSeverityByFile.get(issue.file);
       if (!current || severityPriority[issue.severity] > severityPriority[current]) {
@@ -334,32 +311,12 @@
   }
 
   let filteredStats = $derived.by(() => {
-    if (!scanResult) return { total: 0, blocked: 0, error: 0, warning: 0 };
-
-    let issues = scanResult.issues;
-    if (toolFilter !== "All") {
-      issues = issues.filter((i) => i.tool === toolFilter);
-    }
-    if (severityFilter !== "All") {
-      issues = issues.filter((i) => i.severity === severityFilter);
-    }
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase();
-      issues = issues.filter(
-        (i) =>
-          i.file.toLowerCase().includes(q) ||
-          i.message.toLowerCase().includes(q) ||
-          i.code.toLowerCase().includes(q)
-      );
-    }
-
     const bySeverity: Record<string, number> = {};
-    for (const issue of issues) {
+    for (const issue of baseFilteredIssues) {
       bySeverity[issue.severity] = (bySeverity[issue.severity] || 0) + 1;
     }
-
     return {
-      total: issues.length,
+      total: baseFilteredIssues.length,
       blocked: bySeverity["blocked"] || 0,
       error: bySeverity["error"] || 0,
       warning: bySeverity["warning"] || 0,
