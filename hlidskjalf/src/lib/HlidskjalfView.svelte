@@ -159,8 +159,7 @@
   <!-- Header bar -->
   <header class="header">
     <div class="header-left">
-      <h1 class="title">Hlidskjalf</h1>
-      <span class="subtitle">Agent Watchtower</span>
+      <h1 class="title"><span class="app-name">HLIDSKJALF</span> <span class="sep">::</span> <span class="subtitle">Agent Watchtower</span></h1>
       <span class="status" class:connected>
         {connected ? "listening" : "disconnected"}
       </span>
@@ -307,14 +306,30 @@
   }
 
   .title {
-    font-size: var(--text-xl);
+    font-size: var(--text-lg);
     font-weight: 700;
     margin: 0;
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-md);
+  }
+
+  .app-name {
+    font-weight: 800;
+    letter-spacing: 0.12em;
+  }
+
+  .sep {
+    font-weight: 300;
+    opacity: 0.5;
+    color: var(--text-secondary);
   }
 
   .subtitle {
     font-size: var(--text-sm);
+    font-weight: 300;
     color: var(--text-secondary);
+    letter-spacing: 0.04em;
   }
 
   .status {

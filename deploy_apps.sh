@@ -5,7 +5,13 @@ WORKSPACE="/Users/johnny/.ai/smidja/yggdrasil"
 BUNDLE_DIR="$WORKSPACE/target/release/bundle/macos"
 DEST="/Applications"
 
-APPS=(hlidskjalf svalinn kvasir ratatoskr yggdrasil)
+ALL_APPS=(hlidskjalf svalinn kvasir ratatoskr yggdrasil)
+
+if [ $# -gt 0 ]; then
+    APPS=("$@")
+else
+    APPS=("${ALL_APPS[@]}")
+fi
 
 # Build all apps
 for app in "${APPS[@]}"; do

@@ -343,8 +343,7 @@
   {/snippet}
 
   <header>
-    <h1>Svalinn</h1>
-    <p class="subtitle">Code Quality Viewer</p>
+    <h1><span class="app-name">SVALINN</span> <span class="separator">::</span> <span class="subtitle">Code Quality</span></h1>
   </header>
 
   <section class="controls">
@@ -486,13 +485,29 @@
 
   h1 {
     margin: 0;
-    font-size: var(--text-3xl);
+    font-size: var(--text-lg);
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-md);
     color: var(--text-primary);
   }
 
-  .subtitle {
-    margin: var(--space-sm) 0 0;
+  .app-name {
+    font-weight: 800;
+    letter-spacing: 0.12em;
+  }
+
+  .separator {
+    font-weight: 300;
+    opacity: 0.5;
     color: var(--text-secondary);
+  }
+
+  .subtitle {
+    font-weight: 300;
+    font-size: var(--text-sm);
+    color: var(--text-secondary);
+    letter-spacing: 0.04em;
   }
 
   .controls {

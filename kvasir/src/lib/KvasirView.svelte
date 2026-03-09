@@ -17,6 +17,7 @@
       convert_to_all_formats: "convert_to_all_formats",
       detect_data_format: "detect_data_format",
     },
+    openFile = null,
   }: {
     commands?: {
       list_directory: string;
@@ -25,6 +26,7 @@
       convert_to_all_formats: string;
       detect_data_format: string;
     };
+    openFile?: string | null;
   } = $props();
 
   interface FileTreeEntry {
@@ -212,6 +214,13 @@
     }
   }
 
+  // React to external file-open requests (Finder "Open With", cross-app nav)
+  $effect(() => {
+    if (openFile) {
+      loadFile(openFile);
+    }
+  });
+
   async function openInEditor(line: number = 1) {
     if (!selectedFile) return;
     try {
@@ -364,8 +373,7 @@
   {/snippet}
 
   <header>
-    <h1>Kvasir</h1>
-    <p class="subtitle">Workspace Inspector</p>
+    <h1><span class="app-name">KVASIR</span> <span class="separator">::</span> <span class="subtitle">Workspace Inspector</span></h1>
   </header>
 
     <section class="controls">
@@ -526,19 +534,34 @@
   }
 
   header {
-    text-align: center;
-    margin-bottom: var(--space-3xl);
+    margin-bottom: var(--space-xl);
   }
 
   h1 {
     margin: 0;
-    font-size: var(--text-3xl);
+    font-size: var(--text-lg);
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-md);
+  }
+
+  .app-name {
+    font-weight: 800;
+    letter-spacing: 0.12em;
     color: var(--text-primary);
   }
 
-  .subtitle {
-    margin: var(--space-md) 0 0;
+  .separator {
     color: var(--text-secondary);
+    font-weight: 300;
+    opacity: 0.5;
+  }
+
+  .subtitle {
+    font-weight: 300;
+    color: var(--text-secondary);
+    font-size: var(--text-sm);
+    letter-spacing: 0.04em;
   }
 
   .controls {
