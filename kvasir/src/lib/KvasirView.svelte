@@ -7,7 +7,10 @@
   import { marked } from "marked";
   import MarkdownPreview from "./MarkdownPreview.svelte";
   import SchemaInspector from "./SchemaInspector.svelte";
+  import JsonlViewer from "./JsonlViewer.svelte";
+  import FormatControls from "./FormatControls.svelte";
   import { analyzeSchema, type InspectedSchema } from "./schema-inspect";
+  import type { FileTreeEntry, FileContent, AllFormats, KvasTreeNode, ViewTab, DataFormat, WrapMode } from "./kvasir-types";
 
   let {
     commands = {
@@ -35,55 +38,7 @@
     openFile?: string | null;
   } = $props();
 
-  interface FileTreeEntry {
-    name: string;
-    path: string;
-    is_dir: boolean;
-    extension: string | null;
-    size_bytes: number;
-  }
-
-  interface FileContent {
-    path: string;
-    content: string;
-    language: string;
-    line_count: number;
-    size_bytes: number;
-  }
-
-  interface FormatConversion {
-    content: string;
-    token_count: number;
-  }
-
-  interface AllFormats {
-    json: FormatConversion;
-    yaml: FormatConversion;
-    toml: FormatConversion;
-    toon: FormatConversion;
-    source_format: string;
-  }
-
-  interface JsonlInfo {
-    path: string;
-    entry_count: number;
-    size_bytes: number;
-  }
-
-  interface JsonlEntry {
-    index: number;
-    content: string;
-    entry_count: number;
-  }
-
-  interface KvasTreeNode extends FileTreeEntry {
-    expanded: boolean;
-    children: KvasTreeNode[];
-    loading: boolean;
-  }
-
-  type ViewTab = "code" | "data" | "preview" | "inspect" | "jsonl";
-  type DataFormat = "json" | "yaml" | "toml" | "toon";
+  // ── State ──────────────────────────────────────────────────────────────
 
   let directory = $state("");
   let treeRoot: KvasTreeNode | null = $state(null);
@@ -98,10 +53,9 @@
   let isDataFile = $state(false);
   let isMarkdownFile = $state(false);
   let isSchemaFile = $state(false);
+  let isJsonlFile = $state(false);
   let inspectedSchema: InspectedSchema | null = $state(null);
   let showHidden = $state(false);
-
-  type WrapMode = "nowrap" | "wrap79" | "wrapwidth";
   let wrapMode: WrapMode = $state("nowrap");
 
   function cycleWrap() {
@@ -116,14 +70,7 @@
     return "wrap fit";
   }
 
-  // JSONL viewer state
-  let isJsonlFile = $state(false);
-  let jsonlInfo: JsonlInfo | null = $state(null);
-  let jsonlEntry: JsonlEntry | null = $state(null);
-  let jsonlFormat: DataFormat = $state("json");
-  let jsonlConverted: AllFormats | null = $state(null);
-  let scrubberIndex = $state(0);
-  let scrubTimer: ReturnType<typeof setTimeout> | null = null;
+  // ── Tree operations ────────────────────────────────────────────────────
 
   async function selectDirectory() {
     const selected = await open({
@@ -204,18 +151,32 @@
     await loadFile(path);
   }
 
+  // ── File loading ───────────────────────────────────────────────────────
+
   async function loadFile(path: string) {
     selectedFile = path;
     error = "";
     dataFormats = null;
 
     try {
+      // Detect format first — JSONL skips read_file entirely
+      const format = await invoke<string | null>(commands.detect_data_format, { path });
+
+      isJsonlFile = format === "jsonl";
+      if (isJsonlFile) {
+        fileContent = null;
+        isDataFile = false;
+        isMarkdownFile = false;
+        isSchemaFile = false;
+        inspectedSchema = null;
+        activeTab = "jsonl";
+        return;
+      }
+
       fileContent = await invoke<FileContent>(commands.read_file, { path });
 
-      // Check if it's a markdown file
       isMarkdownFile = fileContent.language === "markdown";
 
-      // Check if it's a JSON Schema file (.schema.json)
       isSchemaFile = path.endsWith(".schema.json");
       inspectedSchema = null;
       if (isSchemaFile && fileContent) {
@@ -224,30 +185,6 @@
         } catch (e) {
           console.error("Schema inspection failed:", e);
         }
-      }
-
-      // Check if it's a data file and load conversions
-      const format = await invoke<string | null>(commands.detect_data_format, { path });
-
-      // JSONL gets its own viewer
-      isJsonlFile = format === "jsonl";
-      if (isJsonlFile) {
-        isDataFile = false;
-        jsonlInfo = await invoke<JsonlInfo>(commands.read_jsonl_info, { path });
-        if (jsonlInfo.entry_count > 0) {
-          jsonlEntry = await invoke<JsonlEntry>(commands.read_jsonl_entry, {
-            path,
-            index: jsonlInfo.entry_count - 1,
-          });
-          scrubberIndex = jsonlInfo.entry_count - 1;
-        } else {
-          jsonlEntry = null;
-          scrubberIndex = 0;
-        }
-        jsonlFormat = "json";
-        jsonlConverted = null;
-        activeTab = "jsonl";
-        return;
       }
 
       isDataFile = format !== null;
@@ -264,7 +201,6 @@
         }
       }
 
-      // Default tab selection
       if (isSchemaFile && inspectedSchema) {
         activeTab = "inspect";
       } else if (isMarkdownFile) {
@@ -278,101 +214,13 @@
     }
   }
 
-  // React to external file-open requests (Finder "Open With", cross-app nav)
   $effect(() => {
     if (openFile) {
       loadFile(openFile);
     }
   });
 
-  // ── JSONL navigation ─────────────────────────────────────────────────
-
-  async function jsonlNavigate(index: number) {
-    if (!selectedFile || !jsonlInfo) return;
-    if (index < 0 || index >= jsonlInfo.entry_count) return;
-    jsonlEntry = await invoke<JsonlEntry>(commands.read_jsonl_entry, {
-      path: selectedFile,
-      index,
-    });
-    scrubberIndex = index;
-    jsonlConverted = null;
-    if (jsonlFormat !== "json") {
-      await convertJsonlEntry();
-    }
-  }
-
-  function jsonlFirst() { jsonlNavigate(0); }
-  function jsonlPrev() { if (jsonlEntry) jsonlNavigate(jsonlEntry.index - 1); }
-  function jsonlNext() { if (jsonlEntry) jsonlNavigate(jsonlEntry.index + 1); }
-  function jsonlLast() { if (jsonlInfo) jsonlNavigate(jsonlInfo.entry_count - 1); }
-
-  function handleScrub(e: Event) {
-    const target = e.target as HTMLInputElement;
-    scrubberIndex = parseInt(target.value);
-    if (scrubTimer) clearTimeout(scrubTimer);
-    scrubTimer = setTimeout(() => {
-      jsonlNavigate(scrubberIndex);
-    }, 1000);
-  }
-
-  async function convertJsonlEntry() {
-    if (!jsonlEntry || jsonlFormat === "json") {
-      jsonlConverted = null;
-      return;
-    }
-    jsonlConverted = await invoke<AllFormats>(commands.convert_to_all_formats, {
-      content: jsonlEntry.content,
-      sourceFormat: "json",
-    });
-  }
-
-  async function exportJsonlEntry() {
-    if (!jsonlEntry || !selectedFile) return;
-    const sourceName = selectedFile.split("/").pop()?.replace(".jsonl", "") || "entry";
-    const tempPath = await invoke<string>(commands.export_entry_as, {
-      content: jsonlEntry.content,
-      format: jsonlFormat,
-      sourceName,
-      index: jsonlEntry.index,
-    });
-    await invoke(commands.open_in_editor, { path: tempPath, line: 1 });
-  }
-
-  let jsonlDisplayContent = $derived.by(() => {
-    if (!jsonlEntry) return "";
-    if (jsonlFormat === "json") return jsonlEntry.content;
-    if (jsonlConverted) {
-      const fmt = jsonlConverted[jsonlFormat as keyof Pick<AllFormats, "json" | "yaml" | "toml" | "toon">];
-      return fmt?.content || jsonlEntry.content;
-    }
-    return jsonlEntry.content;
-  });
-
-  let jsonlHighlighted = $derived.by(() => {
-    if (!jsonlDisplayContent) return "";
-    const lang = jsonlFormat === "toon" ? "yaml" : jsonlFormat;
-    const hljsLang = getHljsLanguage(lang);
-    try {
-      return hljs.highlight(jsonlDisplayContent, { language: hljsLang }).value;
-    } catch {
-      return hljs.highlightAuto(jsonlDisplayContent).value;
-    }
-  });
-
-  function handleJsonlKeydown(e: KeyboardEvent) {
-    if (activeTab !== "jsonl") return;
-    switch (e.key) {
-      case "ArrowUp": e.preventDefault(); jsonlPrev(); break;
-      case "ArrowDown": e.preventDefault(); jsonlNext(); break;
-      case "ArrowLeft": e.preventDefault(); jsonlFirst(); break;
-      case "ArrowRight": e.preventDefault(); jsonlLast(); break;
-    }
-  }
-
-  $effect(() => {
-    window.addEventListener("keydown", handleJsonlKeydown);
-    return () => window.removeEventListener("keydown", handleJsonlKeydown);
-  });
+  // ── Helpers ────────────────────────────────────────────────────────────
 
   async function openInEditor(line: number = 1) {
     if (!selectedFile) return;
@@ -420,7 +268,6 @@
     }
   }
 
-  // Map language names to highlight.js language identifiers
   function getHljsLanguage(lang: string): string {
     const mapping: Record<string, string> = {
       "python": "python",
@@ -455,7 +302,8 @@
     return mapping[lang] || "plaintext";
   }
 
-  // Get current display content based on active tab and format
+  // ── Derived state ──────────────────────────────────────────────────────
+
   let displayContent = $derived.by(() => {
     if (activeTab === "data" && dataFormats) {
       return dataFormats[selectedFormat].content;
@@ -463,7 +311,6 @@
     return fileContent?.content || "";
   });
 
-  // Syntax highlighted content
   let highlightedContent = $derived.by(() => {
     if (!displayContent) return "";
     const lang = activeTab === "data"
@@ -479,29 +326,9 @@
     }
   });
 
-  // Rendered markdown
   let renderedMarkdown = $derived.by(() => {
     if (!fileContent?.content || !isMarkdownFile) return "";
     return marked(fileContent.content) as string;
-  });
-
-  let displayLineCount = $derived.by(() => {
-    return displayContent.split('\n').length;
-  });
-
-  // Token savings calculation
-  let tokenStats = $derived.by(() => {
-    if (!dataFormats) return null;
-    const source = dataFormats.source_format as DataFormat;
-    const baseline = dataFormats[source].token_count;
-    return {
-      json: { count: dataFormats.json.token_count, savings: baseline - dataFormats.json.token_count },
-      yaml: { count: dataFormats.yaml.token_count, savings: baseline - dataFormats.yaml.token_count },
-      toml: { count: dataFormats.toml.token_count, savings: baseline - dataFormats.toml.token_count },
-      toon: { count: dataFormats.toon.token_count, savings: baseline - dataFormats.toon.token_count },
-      source,
-      baseline,
-    };
   });
 </script>
 
@@ -551,7 +378,37 @@
       </section>
     {/if}
 
-    {#if fileContent}
+    {#if isJsonlFile && selectedFile}
+      <!-- JSONL: independent path, no fileContent needed -->
+      <section class="file-info">
+        <div class="file-path">
+          <strong>{relativePath(selectedFile)}</strong>
+        </div>
+      </section>
+      <section class="tabs">
+        <button class="tab active">JSONL</button>
+        <button
+          class="tab wrap-toggle"
+          class:active={wrapMode !== "nowrap"}
+          onclick={cycleWrap}
+          title="Cycle: no wrap → wrap 79 → wrap to width"
+        >
+          {wrapLabel()}
+        </button>
+      </section>
+      <JsonlViewer
+        commands={{
+          read_jsonl_info: commands.read_jsonl_info,
+          read_jsonl_entry: commands.read_jsonl_entry,
+          export_entry_as: commands.export_entry_as,
+          convert_to_all_formats: commands.convert_to_all_formats,
+          open_in_editor: commands.open_in_editor,
+        }}
+        path={selectedFile}
+        {wrapMode}
+        {getHljsLanguage}
+      />
+    {:else if fileContent}
       <section class="file-info">
         <div class="file-path">
           <strong>{relativePath(fileContent.path)}</strong>
@@ -600,15 +457,6 @@
             Inspect
           </button>
         {/if}
-        {#if isJsonlFile}
-          <button
-            class="tab"
-            class:active={activeTab === "jsonl"}
-            onclick={() => activeTab = "jsonl"}
-          >
-            JSONL
-          </button>
-        {/if}
         <button
           class="tab wrap-toggle"
           class:active={wrapMode !== "nowrap"}
@@ -620,96 +468,12 @@
       </section>
 
       <!-- Data view format selector and token stats -->
-      {#if activeTab === "data" && dataFormats && tokenStats}
-        <section class="data-controls">
-          <div class="format-selector">
-            {#each ["json", "yaml", "toml", "toon"] as fmt}
-              <button
-                class="format-btn"
-                class:active={selectedFormat === fmt}
-                class:source={tokenStats.source === fmt}
-                onclick={() => selectedFormat = fmt as DataFormat}
-              >
-                {fmt.toUpperCase()}
-              </button>
-            {/each}
-          </div>
-          <div class="token-stats">
-            <span class="token-label">Tokens:</span>
-            {#each ["json", "yaml", "toml", "toon"] as fmt}
-              {@const stat = tokenStats[fmt as DataFormat]}
-              <span
-                class="token-item"
-                class:source={tokenStats.source === fmt}
-                class:active={selectedFormat === fmt}
-              >
-                {fmt.toUpperCase()}: {stat.count.toLocaleString()}
-                {#if tokenStats.source !== fmt}
-                  <span class="savings" class:positive={stat.savings > 0} class:negative={stat.savings < 0}>
-                    ({stat.savings > 0 ? '-' : '+'}{Math.abs(Math.round(stat.savings / tokenStats.baseline * 100))}%)
-                  </span>
-                {/if}
-              </span>
-            {/each}
-          </div>
-        </section>
+      {#if activeTab === "data" && dataFormats}
+        <FormatControls {dataFormats} bind:selectedFormat />
       {/if}
 
-      <!-- JSONL viewer -->
-      {#if activeTab === "jsonl" && jsonlInfo}
-        <section class="jsonl-controls">
-          <div class="jsonl-nav">
-            <button class="nav-btn" onclick={jsonlFirst} disabled={!jsonlEntry || jsonlEntry.index === 0}
-              title="First entry (Left arrow)">&#9664;</button>
-            <button class="nav-btn" onclick={jsonlPrev} disabled={!jsonlEntry || jsonlEntry.index === 0}
-              title="Previous entry (Up arrow)">&#9650;</button>
-            <button class="nav-btn" onclick={jsonlNext} disabled={!jsonlEntry || jsonlEntry.index >= jsonlInfo.entry_count - 1}
-              title="Next entry (Down arrow)">&#9660;</button>
-            <button class="nav-btn" onclick={jsonlLast} disabled={!jsonlEntry || jsonlEntry.index >= jsonlInfo.entry_count - 1}
-              title="Last entry (Right arrow)">&#9654;</button>
-            <span class="jsonl-position">
-              {scrubberIndex + 1} / {jsonlInfo.entry_count.toLocaleString()}
-            </span>
-          </div>
-          {#if jsonlInfo.entry_count > 1}
-            <input
-              type="range"
-              class="jsonl-scrubber"
-              min={0}
-              max={jsonlInfo.entry_count - 1}
-              value={scrubberIndex}
-              oninput={handleScrub}
-            />
-          {/if}
-          <div class="jsonl-right">
-            <div class="format-selector">
-              {#each ["json", "yaml", "toml", "toon"] as fmt}
-                <button
-                  class="format-btn"
-                  class:active={jsonlFormat === fmt}
-                  onclick={() => { jsonlFormat = fmt as DataFormat; convertJsonlEntry(); }}
-                >
-                  {fmt.toUpperCase()}
-                </button>
-              {/each}
-            </div>
-            <Button variant="ghost" onclick={exportJsonlEntry}>Open in Editor</Button>
-          </div>
-        </section>
-
-        {#if jsonlEntry}
-          <section class="code-viewer" class:wrap79={wrapMode === "wrap79"} class:wrapwidth={wrapMode === "wrapwidth"}>
-            <pre><code>{#each jsonlDisplayContent.split('\n') as line, i}{@const highlighted = jsonlHighlighted.split('\n')[i] || ''}<span class="line-number">{i + 1}</span><span class="line-content">{@html highlighted}</span>
-{/each}</code></pre>
-          </section>
-        {:else}
-          <section class="empty-state">
-            <p>Empty JSONL file</p>
-          </section>
-        {/if}
-
       <!-- Schema Inspector -->
-      {:else if activeTab === "inspect" && inspectedSchema}
+      {#if activeTab === "inspect" && inspectedSchema}
         <section class="inspector-view">
           <SchemaInspector schema={inspectedSchema} />
         </section>
@@ -843,7 +607,6 @@
     color: var(--text-primary);
   }
 
-  /* Tabs */
   .tabs {
     display: flex;
     gap: var(--space-sm);
@@ -869,84 +632,10 @@
     border-bottom: 2px solid var(--action-primary);
   }
 
-  /* Data controls */
-  .data-controls {
-    background: var(--bg-secondary);
-    padding: var(--space-lg);
-    border-radius: var(--radius-md);
-    margin-bottom: var(--space-lg);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: var(--space-lg);
-  }
-
-  .format-selector {
-    display: flex;
-    gap: var(--space-sm);
-  }
-
-  .format-btn {
-    padding: var(--space-sm) var(--space-lg);
-    border: none;
-    border-radius: var(--radius-sm);
-    background: var(--action-neutral);
-    color: var(--text-primary);
-    cursor: pointer;
-    font-size: var(--text-sm);
-    font-weight: 500;
-  }
-
-  .format-btn:hover {
-    background: var(--action-neutral-hover);
-  }
-
-  .format-btn.active {
-    background: var(--action-primary);
-  }
-
-  .format-btn.source {
-    border: 2px solid var(--severity-info);
-  }
-
-  .token-stats {
-    display: flex;
-    gap: var(--space-lg);
-    align-items: center;
-    font-size: var(--text-sm);
-    color: var(--text-secondary);
-    flex-wrap: wrap;
-  }
-
-  .token-label {
-    font-weight: 500;
-  }
-
-  .token-item {
-    padding: var(--space-xs) var(--space-sm);
-    border-radius: var(--radius-sm);
-  }
-
-  .token-item.source {
-    color: var(--severity-info);
-  }
-
-  .token-item.active {
-    background: var(--bg-hover);
-  }
-
-  .savings {
+  .wrap-toggle {
+    margin-left: auto;
+    font-family: var(--font-mono);
     font-size: var(--text-xs);
-    margin-left: var(--space-xs);
-  }
-
-  .savings.positive {
-    color: var(--severity-info);
-  }
-
-  .savings.negative {
-    color: var(--severity-warning);
   }
 
   .code-viewer {
@@ -993,12 +682,6 @@
     max-width: 79ch;
   }
 
-  .wrap-toggle {
-    margin-left: auto;
-    font-family: var(--font-mono);
-    font-size: var(--text-xs);
-  }
-
   .inspector-view {
     background: var(--bg-secondary);
     border-radius: var(--radius-md);
@@ -1009,76 +692,5 @@
     text-align: center;
     padding: 4rem var(--space-3xl);
     color: var(--text-secondary);
-  }
-
-  /* JSONL controls */
-  .jsonl-controls {
-    background: var(--bg-secondary);
-    padding: var(--space-lg);
-    border-radius: var(--radius-md);
-    margin-bottom: var(--space-lg);
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-md);
-  }
-
-  .jsonl-nav {
-    display: flex;
-    align-items: center;
-    gap: var(--space-sm);
-  }
-
-  .nav-btn {
-    padding: var(--space-xs) var(--space-md);
-    border: 1px solid var(--border-default);
-    border-radius: var(--radius-sm);
-    background: var(--action-neutral);
-    color: var(--text-primary);
-    cursor: pointer;
-    font-size: var(--text-sm);
-    line-height: 1;
-  }
-
-  .nav-btn:hover:not(:disabled) {
-    background: var(--action-neutral-hover);
-  }
-
-  .nav-btn:disabled {
-    opacity: 0.3;
-    cursor: default;
-  }
-
-  .jsonl-position {
-    font-family: var(--font-mono);
-    font-size: var(--text-sm);
-    color: var(--text-secondary);
-    margin-left: var(--space-md);
-    font-variant-numeric: tabular-nums;
-  }
-
-  .jsonl-scrubber {
-    width: 100%;
-    height: 4px;
-    appearance: none;
-    background: var(--bg-tertiary);
-    border-radius: 2px;
-    outline: none;
-    cursor: pointer;
-  }
-
-  .jsonl-scrubber::-webkit-slider-thumb {
-    appearance: none;
-    width: 14px;
-    height: 14px;
-    border-radius: 50%;
-    background: var(--action-primary);
-    cursor: pointer;
-  }
-
-  .jsonl-right {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--space-lg);
   }
 </style>

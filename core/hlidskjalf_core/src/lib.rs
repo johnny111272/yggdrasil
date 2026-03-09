@@ -1,9 +1,11 @@
 use serde::Deserialize;
-use std::io::Write;
+use std::net::{Ipv4Addr, UdpSocket};
 use std::path::PathBuf;
-use tokio::io::AsyncBufReadExt;
 
 pub use socket_emit::{Datagram, DatagramKind, Priority};
+
+const MULTICAST_ADDR: Ipv4Addr = Ipv4Addr::new(239, 0, 0, 1);
+const MULTICAST_PORT: u16 = 9899;
 
 // ── Legacy HookEvent (backward compat) ───────────────────────────
 
@@ -59,56 +61,55 @@ impl From<HookEvent> for Datagram {
 
 /// Parse a JSON line as either a Datagram or legacy HookEvent (converted to Datagram).
 fn parse_event(line: &str) -> Option<Datagram> {
-    // Try new format first
     if let Ok(dg) = serde_json::from_str::<Datagram>(line) {
         return Some(dg);
     }
-    // Fallback to legacy format
     if let Ok(ev) = serde_json::from_str::<HookEvent>(line) {
         return Some(ev.into());
     }
     None
 }
 
-/// Start listening on the Unix socket, forwarding parsed events to the channel.
-/// Runs until the sender is dropped.
+// ── Multicast listener ──────────────────────────────────────────
+
+/// Join UDP multicast group and forward parsed datagrams to the channel.
+/// Receives from socket_emit producers on 239.0.0.1:9899.
 pub async fn start_listener(
     sender: tokio::sync::mpsc::UnboundedSender<Datagram>,
 ) -> Result<(), String> {
-    let socket_path = "/tmp/hlidskjalf.sock";
+    // Bind + join on a std socket, then convert to tokio.
+    // Join on loopback — socket_emit sends with TTL=0 (loopback only).
+    let std_socket = UdpSocket::bind(("0.0.0.0", MULTICAST_PORT))
+        .map_err(|e| format!("Failed to bind multicast port {}: {}", MULTICAST_PORT, e))?;
+    std_socket
+        .join_multicast_v4(&MULTICAST_ADDR, &Ipv4Addr::LOCALHOST)
+        .map_err(|e| format!("Failed to join multicast group: {}", e))?;
+    std_socket
+        .set_nonblocking(true)
+        .map_err(|e| format!("Failed to set non-blocking: {}", e))?;
 
-    // Remove stale socket file
-    let _ = std::fs::remove_file(socket_path);
-
-    let listener = tokio::net::UnixListener::bind(socket_path)
-        .map_err(|e| format!("Failed to bind socket: {}", e))?;
+    let socket = tokio::net::UdpSocket::from_std(std_socket)
+        .map_err(|e| format!("Failed to create async socket: {}", e))?;
 
     tokio::spawn(async move {
+        let mut buf = [0u8; 65535];
         loop {
-            match listener.accept().await {
-                Ok((stream, _)) => {
-                    let tx = sender.clone();
-                    tokio::spawn(async move {
-                        let reader = tokio::io::BufReader::new(stream);
-                        let mut lines = reader.lines();
-                        while let Ok(Some(line)) = lines.next_line().await {
-                            if line.trim().is_empty() {
-                                continue;
-                            }
-                            match parse_event(&line) {
-                                Some(datagram) => {
-                                    append_to_log(&datagram);
-                                    let _ = tx.send(datagram);
-                                }
-                                None => {
-                                    eprintln!("Failed to parse event: {}", line);
-                                }
-                            }
-                        }
-                    });
+            match socket.recv_from(&mut buf).await {
+                Ok((len, _addr)) => {
+                    let data = &buf[..len];
+                    let line = match std::str::from_utf8(data) {
+                        Ok(s) => s.trim(),
+                        Err(_) => continue,
+                    };
+                    if line.is_empty() {
+                        continue;
+                    }
+                    if let Some(datagram) = parse_event(line) {
+                        let _ = sender.send(datagram);
+                    }
                 }
                 Err(e) => {
-                    eprintln!("Socket accept error: {}", e);
+                    eprintln!("Multicast recv error: {}", e);
                 }
             }
         }
@@ -117,63 +118,12 @@ pub async fn start_listener(
     Ok(())
 }
 
-// ── Rolling event log ─────────────────────────────────────────────
+// ── Lockfile system ──────────────────────────────────────────────
 
 fn hlidskjalf_dir() -> PathBuf {
     let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".to_string());
     PathBuf::from(home).join(".ai").join("hlidskjalf")
 }
-
-fn log_path() -> PathBuf {
-    hlidskjalf_dir().join("events.jsonl")
-}
-
-fn append_to_log(datagram: &Datagram) {
-    let dir = hlidskjalf_dir();
-    if !dir.exists() {
-        let _ = std::fs::create_dir_all(&dir);
-    }
-    if let Ok(json) = serde_json::to_string(datagram) {
-        if let Ok(mut f) = std::fs::OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(log_path())
-        {
-            let _ = writeln!(f, "{}", json);
-        }
-    }
-}
-
-/// Rotate the event log on startup — keep only last 24h of events.
-pub fn rotate_log() {
-    let path = log_path();
-    if !path.exists() {
-        return;
-    }
-    let cutoff = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_secs_f64())
-        .unwrap_or(0.0)
-        - 86400.0;
-
-    let content = match std::fs::read_to_string(&path) {
-        Ok(c) => c,
-        Err(_) => return,
-    };
-
-    let kept: Vec<&str> = content
-        .lines()
-        .filter(|line| {
-            serde_json::from_str::<Datagram>(line)
-                .map(|d| d.timestamp >= cutoff)
-                .unwrap_or(false)
-        })
-        .collect();
-
-    let _ = std::fs::write(&path, kept.join("\n") + if kept.is_empty() { "" } else { "\n" });
-}
-
-// ── Lockfile system ──────────────────────────────────────────────
 
 fn keep_alive_path() -> PathBuf {
     hlidskjalf_dir().join("KEEP_ALIVE.lock")
@@ -242,13 +192,12 @@ fn now() -> f64 {
 
 // ── Orchestration ────────────────────────────────────────────────
 
-/// Initialize the full Hlidskjalf subsystem: rotate logs, set up lockfiles,
-/// start the Unix socket listener, and start the lockfile monitor.
+/// Initialize the full Hlidskjalf subsystem: set up lockfiles,
+/// start the multicast listener, and start the lockfile monitor.
 /// All parsed events are forwarded to the provided channel.
 pub async fn start_all(
     sender: tokio::sync::mpsc::UnboundedSender<Datagram>,
 ) -> Result<(), String> {
-    rotate_log();
     init_lockfiles();
     start_listener(sender.clone()).await?;
     start_lockfile_monitor(sender).await;
