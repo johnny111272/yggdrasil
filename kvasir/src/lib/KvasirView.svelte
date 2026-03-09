@@ -2,7 +2,6 @@
   import { invoke } from "@tauri-apps/api/core";
   import { open } from "@tauri-apps/plugin-dialog";
   import { Button, SidebarLayout } from "@yggdrasil/ui";
-  import { onMount } from "svelte";
   import hljs from "highlight.js";
   import "highlight.js/styles/github-dark.css";
   import { marked } from "marked";

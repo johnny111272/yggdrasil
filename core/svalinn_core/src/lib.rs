@@ -59,12 +59,6 @@ pub struct SvalFileTreeEntry {
 #[derive(Debug, Deserialize)]
 struct QaSidecarReport {
     file: String,
-    #[allow(dead_code)]
-    relative_path: Option<String>,
-    #[allow(dead_code)]
-    content_hash: Option<String>,
-    #[allow(dead_code)]
-    generated_at: Option<String>,
     issues: Vec<SidecarIssue>,
 }
 

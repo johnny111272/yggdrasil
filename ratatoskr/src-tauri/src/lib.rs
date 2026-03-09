@@ -1,4 +1,4 @@
-use ratatoskr_core::*;
+use ratatoskr_core::{GraphData, GraphStats};
 
 #[tauri::command]
 fn load_graph(path: String) -> Result<GraphData, String> {
@@ -27,5 +27,5 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![load_graph, save_graph, get_graph_stats, generate_sample_graph])
         .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .expect("Ratatoskr failed to start");
 }

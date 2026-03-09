@@ -129,5 +129,5 @@ pub fn run() {
             rata_generate_sample_graph,
         ])
         .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .expect("Yggdrasil failed to start");
 }

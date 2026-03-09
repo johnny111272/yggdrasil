@@ -16,9 +16,7 @@
     "@yggdrasil/ui": "file:../ui",
     "@tauri-apps/api": "^2.10.1",
     "@tauri-apps/plugin-dialog": "^2.6.0",
-    "@tauri-apps/plugin-opener": "^2",
-    "highlight.js": "^11.11.1",
-    "marked": "^17.0.1"
+    "@tauri-apps/plugin-opener": "^2"
   },
   "devDependencies": {
     "@sveltejs/adapter-static": "^3.0.6",

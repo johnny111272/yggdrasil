@@ -23,5 +23,5 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![start_monitor, speak])
         .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .expect("Hlidskjalf failed to start");
 }

@@ -1,4 +1,4 @@
-use svalinn_core::*;
+use svalinn_core::{ScanResult, SvalFileTreeEntry, SagaResult};
 
 #[tauri::command]
 fn scan_directory(directory: String, include_tests: bool) -> Result<ScanResult, String> {
@@ -27,5 +27,5 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![scan_directory, open_in_editor, run_saga, list_qa_tree])
         .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .expect("Svalinn failed to start");
 }

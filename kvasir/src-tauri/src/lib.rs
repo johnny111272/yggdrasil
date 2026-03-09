@@ -1,4 +1,4 @@
-use kvasir_core::*;
+use kvasir_core::{KvasFileTreeEntry, FileContent, AllFormats};
 
 #[tauri::command]
 fn list_directory(directory: String) -> Result<Vec<KvasFileTreeEntry>, String> {
@@ -32,5 +32,5 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![list_directory, read_file, open_in_editor, convert_to_all_formats, detect_data_format])
         .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .expect("Kvasir failed to start");
 }

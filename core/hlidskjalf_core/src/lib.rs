@@ -15,8 +15,6 @@ struct HookEvent {
     event_name: String,
     workspace: String,
     detail: String,
-    #[allow(dead_code)]
-    context_injected: String,
     #[serde(default)]
     speech: Option<String>,
     #[serde(default)]
