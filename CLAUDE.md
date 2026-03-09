@@ -57,6 +57,11 @@ None of them felt uncertain while doing it.
 **Why it's wrong:** The `ui/` directory is a shared component library consumed by all 5 apps. A change to `SidebarLayout.svelte` affects every app that uses it. CSS token changes propagate everywhere.
 **Recovery:** Grep for the component name across all app `src/` directories before modifying.
 
+### Adding App Logic to Yggdrasil Instead of the App
+**Detection:** If you find app-specific state, behavior, event handling, or UI logic in `yggdrasil/src/` that isn't tab switching or command name mapping...
+**Why it's wrong:** Yggdrasil is a thin host — it imports views, maps command names with 4-letter prefixes, and renders a tab strip. That's it. Each app (Hlidskjalf, Svalinn, Kvasir, Ratatoskr) must work identically whether run standalone or inside Yggdrasil. If you add behavior to Yggdrasil, the standalone app diverges silently. This is the most common LLM drift pattern: grep from workspace root, find the view imported in `yggdrasil/src/routes/+page.svelte`, and start editing there instead of in the app's own `src/lib/`.
+**Recovery:** Ask: "Would this change affect the app when run standalone?" If yes, it belongs in the app's own source tree (`hlidskjalf/src/lib/`, `svalinn/src/lib/`, etc.), not in Yggdrasil. The only files in Yggdrasil that should ever change are `+page.svelte` (tab strip), `vite.config.js` (aliases), and `src-tauri/src/lib.rs` (prefixed command registration).
+
 ---
 
 ## Recovery Sources
@@ -70,6 +75,7 @@ None of them felt uncertain while doing it.
 | **NEURODIVERGENT_MODALITIES** | `NEURODIVERGENT_MODALITIES.md` | Multi-modal alert system: LED, click, pulse, flash, speech. Profiles, geiger counter, ambient awareness |
 | **Datagram Schema** | `schemas/datagram.schema.json` | Source of truth for datagram structure |
 | **Deploy Script** | `deploy_apps.sh` | Build and deploy all 5 apps to /Applications |
+| **AUDIT_GUIDE** | `AUDIT_GUIDE.md` | Critical invariants for audit agents: what to verify, where drift happens, non-obvious requirements |
 
 ---
 

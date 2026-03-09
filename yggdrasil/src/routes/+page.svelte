@@ -5,6 +5,19 @@
   import RatatoskrView from "$ratatoskr/RatatoskrView.svelte";
 
   let activeTab = $state("hlidskjalf");
+  let mounted = $state(new Set(["hlidskjalf"]));
+
+  function selectTab(id: string) {
+    mounted.add(id);
+    activeTab = id;
+  }
+
+  function clearDormant() {
+    for (const id of [...mounted]) {
+      if (id !== "hlidskjalf") mounted.delete(id);
+    }
+    activeTab = "hlidskjalf";
+  }
 
   const tabs = [
     { id: "hlidskjalf", label: "Hlidskjalf", desc: "Agent Monitor" },
@@ -12,6 +25,8 @@
     { id: "kvasir",     label: "Kvasir",     desc: "Workspace Inspector" },
     { id: "ratatoskr",  label: "Ratatoskr",  desc: "Graph Viewer" },
   ];
+
+  let hasDormant = $derived(mounted.size > 1);
 </script>
 
 <div class="shell">
@@ -22,31 +37,37 @@
         speak: "hlid_speak",
       }} />
     </div>
-    <div class="view-pane" class:active={activeTab === "svalinn"}>
-      <SvalinnView commands={{
-        scan_directory: "sval_scan_directory",
-        list_qa_tree: "sval_list_qa_tree",
-        open_in_editor: "sval_open_in_editor",
-        run_saga: "sval_run_saga",
-      }} />
-    </div>
-    <div class="view-pane" class:active={activeTab === "kvasir"}>
-      <KvasirView commands={{
-        list_directory: "kvas_list_directory",
-        read_file: "kvas_read_file",
-        open_in_editor: "kvas_open_in_editor",
-        convert_to_all_formats: "kvas_convert_to_all_formats",
-        detect_data_format: "kvas_detect_data_format",
-      }} />
-    </div>
-    <div class="view-pane" class:active={activeTab === "ratatoskr"}>
-      <RatatoskrView commands={{
-        load_graph: "rata_load_graph",
-        save_graph: "rata_save_graph",
-        get_graph_stats: "rata_get_graph_stats",
-        generate_sample_graph: "rata_generate_sample_graph",
-      }} />
-    </div>
+    {#if mounted.has("svalinn")}
+      <div class="view-pane" class:active={activeTab === "svalinn"}>
+        <SvalinnView commands={{
+          scan_directory: "sval_scan_directory",
+          list_qa_tree: "sval_list_qa_tree",
+          open_in_editor: "sval_open_in_editor",
+          run_saga: "sval_run_saga",
+        }} />
+      </div>
+    {/if}
+    {#if mounted.has("kvasir")}
+      <div class="view-pane" class:active={activeTab === "kvasir"}>
+        <KvasirView commands={{
+          list_directory: "kvas_list_directory",
+          read_file: "kvas_read_file",
+          open_in_editor: "kvas_open_in_editor",
+          convert_to_all_formats: "kvas_convert_to_all_formats",
+          detect_data_format: "kvas_detect_data_format",
+        }} />
+      </div>
+    {/if}
+    {#if mounted.has("ratatoskr")}
+      <div class="view-pane" class:active={activeTab === "ratatoskr"}>
+        <RatatoskrView commands={{
+          load_graph: "rata_load_graph",
+          save_graph: "rata_save_graph",
+          get_graph_stats: "rata_get_graph_stats",
+          generate_sample_graph: "rata_generate_sample_graph",
+        }} />
+      </div>
+    {/if}
   </div>
 
   <nav class="tab-strip">
@@ -54,7 +75,8 @@
       <button
         class="tab-btn"
         class:active={activeTab === tab.id}
-        onclick={() => activeTab = tab.id}
+        class:mounted={mounted.has(tab.id) && activeTab !== tab.id}
+        onclick={() => selectTab(tab.id)}
         title="{tab.label} — {tab.desc}"
       >
         {#each tab.label.split("") as char}
@@ -62,6 +84,15 @@
         {/each}
       </button>
     {/each}
+    {#if hasDormant}
+      <button
+        class="tab-btn clear-btn"
+        onclick={clearDormant}
+        title="Clear dormant tabs"
+      >
+        <span class="tab-char">&times;</span>
+      </button>
+    {/if}
   </nav>
 </div>
 
@@ -135,9 +166,19 @@
     color: var(--text-primary);
   }
 
+  .tab-btn.mounted {
+    color: var(--text-primary);
+  }
+
   .tab-btn.active {
     background: var(--action-primary);
     color: var(--text-primary);
     font-weight: 700;
+  }
+
+  .clear-btn {
+    margin-top: auto;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
   }
 </style>

@@ -12,7 +12,8 @@ Yggdrasil is a unified introspection platform — 5 Tauri 2.x desktop apps for m
 
 | Resource | Path | What It Contains | When to Read |
 |----------|------|------------------|--------------|
-| CLAUDE.md | `CLAUDE.md` | Context refresh protocol, 6 anti-patterns, recovery sources, architecture summary | Every session start. Mandatory before writing any code. |
+| CLAUDE.md | `CLAUDE.md` | Context refresh protocol, 7 anti-patterns, recovery sources, architecture summary | Every session start. Mandatory before writing any code. |
+| AUDIT_GUIDE | `AUDIT_GUIDE.md` | Critical invariants, drift patterns, audit checklist for verifying architectural health | Before any audit. When reviewing changes from other agents. |
 | PLAN_UNIFIED_SHELL | `PLAN_UNIFIED_SHELL.md` | Full unified shell architecture: tab strip, Vite aliases, command prefixing, view component contract, deployment | When you need to understand the Yggdrasil host or how apps compose |
 | DISPLAY_AND_FILTERING | `DISPLAY_AND_FILTERING.md` | Exchange diff display design: datagram payload, feed rendering, filter bar, session management | When working on Hlidskjalf's Bifrost integration |
 | NEURODIVERGENT_MODALITIES | `NEURODIVERGENT_MODALITIES.md` | Multi-modal alert system: 5 modalities, profiles, geiger counter, ambient awareness | When working on the alert/notification system |
@@ -30,6 +31,7 @@ Yggdrasil is a unified introspection platform — 5 Tauri 2.x desktop apps for m
 | HLIDSKJALF_DATAGRAM | `HLIDSKJALF_DATAGRAM.md` | Socket protocol, event emission, Hlidskjalf-specific datagram handling, lockfile system | Current |
 | DISPLAY_AND_FILTERING | `DISPLAY_AND_FILTERING.md` | Exchange diff display, session chips, filter bar design | Current — design doc, not yet implemented |
 | NEURODIVERGENT_MODALITIES | `NEURODIVERGENT_MODALITIES.md` | Alert modalities, profiles, ambient awareness system | Current — design doc, not yet implemented |
+| AUDIT_GUIDE | `AUDIT_GUIDE.md` | 6 invariants, 6 drift patterns, runnable checklist | Current |
 
 ### Per-App Outlines
 
@@ -95,7 +97,7 @@ Yggdrasil is a unified introspection platform — 5 Tauri 2.x desktop apps for m
 |-----|---------------|------|-----------------------|
 | Hlidskjalf | `HlidskjalfView.svelte` | `hlidskjalf/src/lib/` | `GleipnirReport.svelte` |
 | Svalinn | `SvalinnView.svelte` | `svalinn/src/lib/` | — |
-| Kvasir | `KvasirView.svelte` | `kvasir/src/lib/` | `SchemaInspector.svelte`, `schema-inspect.ts` |
+| Kvasir | `KvasirView.svelte` | `kvasir/src/lib/` | `MarkdownPreview.svelte`, `SchemaInspector.svelte`, `schema-inspect.ts` |
 | Ratatoskr | `RatatoskrView.svelte` | `ratatoskr/src/lib/` | — |
 
 **View component contract:** Each accepts a `commands` prop mapping bare command names to (potentially prefixed) names. Internal imports use `./` (not `$lib/`). This allows Yggdrasil to import them via Vite aliases and supply prefixed command names.
@@ -155,6 +157,7 @@ Severity token: `--severity-success` (green), `--severity-warning` (amber), `--s
 | **How to build and deploy all apps** | `deploy_apps.sh` |
 | **What shared UI components exist** | `ui/components/*.svelte` |
 | **What anti-patterns to avoid** | `CLAUDE.md` "You Will Get These Things Wrong" |
+| **How to audit this codebase** | `AUDIT_GUIDE.md` — invariants, drift patterns, runnable checklist |
 | **How GleipnirReport renders payloads** | `hlidskjalf/src/lib/GleipnirReport.svelte` — reference for building new payload renderers |
 
 ---

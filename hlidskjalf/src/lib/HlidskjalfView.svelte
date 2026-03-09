@@ -100,7 +100,8 @@
   onMount(async () => {
     const unlisten = await listen<Datagram>("datagram", (event) => {
       const ev = event.payload;
-      datagrams = [...datagrams, ev];
+      const cutoff = Date.now() / 1000 - 3600;
+      datagrams = [...datagrams.filter(d => d.ts > cutoff), ev];
 
       // Speech fires when ev.speech is present AND priority >= speechMinPriority
       if (ev.speech && priorityNumeric(ev.priority) >= speechMinPriority) {
