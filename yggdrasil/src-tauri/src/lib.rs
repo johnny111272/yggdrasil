@@ -78,6 +78,21 @@ fn kvas_detect_data_format(path: String) -> Option<String> {
     kvasir_core::detect_data_format(&path)
 }
 
+#[tauri::command]
+fn kvas_read_jsonl_info(path: String) -> Result<kvasir_core::JsonlInfo, String> {
+    kvasir_core::read_jsonl_info(&path)
+}
+
+#[tauri::command]
+fn kvas_read_jsonl_entry(path: String, index: usize) -> Result<kvasir_core::JsonlEntry, String> {
+    kvasir_core::read_jsonl_entry(&path, index)
+}
+
+#[tauri::command]
+fn kvas_export_entry_as(content: String, format: String, source_name: String, index: usize) -> Result<String, String> {
+    kvasir_core::export_entry_as(&content, &format, &source_name, index)
+}
+
 // ============================================================================
 // Ratatoskr commands (rata_ prefix)
 // ============================================================================
@@ -138,6 +153,9 @@ pub fn run() {
             kvas_open_in_editor,
             kvas_convert_to_all_formats,
             kvas_detect_data_format,
+            kvas_read_jsonl_info,
+            kvas_read_jsonl_entry,
+            kvas_export_entry_as,
             // Ratatoskr
             rata_load_graph,
             rata_save_graph,

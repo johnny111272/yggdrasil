@@ -1,6 +1,6 @@
 use std::sync::Mutex;
 use tauri::{Emitter, Manager};
-use kvasir_core::{KvasFileTreeEntry, FileContent, AllFormats};
+use kvasir_core::{KvasFileTreeEntry, FileContent, AllFormats, JsonlInfo, JsonlEntry};
 
 // ── Managed state for file-open-from-OS race condition ───────────────
 struct PendingFile(Mutex<Option<String>>);
@@ -33,6 +33,21 @@ fn detect_data_format(path: String) -> Option<String> {
 }
 
 #[tauri::command]
+fn read_jsonl_info(path: String) -> Result<JsonlInfo, String> {
+    kvasir_core::read_jsonl_info(&path)
+}
+
+#[tauri::command]
+fn read_jsonl_entry(path: String, index: usize) -> Result<JsonlEntry, String> {
+    kvasir_core::read_jsonl_entry(&path, index)
+}
+
+#[tauri::command]
+fn export_entry_as(content: String, format: String, source_name: String, index: usize) -> Result<String, String> {
+    kvasir_core::export_entry_as(&content, &format, &source_name, index)
+}
+
+#[tauri::command]
 fn get_pending_file(state: tauri::State<PendingFile>) -> Option<String> {
     state.0.lock().unwrap().take()
 }
@@ -51,6 +66,9 @@ pub fn run() {
             open_in_editor,
             convert_to_all_formats,
             detect_data_format,
+            read_jsonl_info,
+            read_jsonl_entry,
+            export_entry_as,
             get_pending_file,
         ])
         .build(tauri::generate_context!())

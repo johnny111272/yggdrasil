@@ -16,6 +16,9 @@
       open_in_editor: "open_in_editor",
       convert_to_all_formats: "convert_to_all_formats",
       detect_data_format: "detect_data_format",
+      read_jsonl_info: "read_jsonl_info",
+      read_jsonl_entry: "read_jsonl_entry",
+      export_entry_as: "export_entry_as",
     },
     openFile = null,
   }: {
@@ -25,6 +28,9 @@
       open_in_editor: string;
       convert_to_all_formats: string;
       detect_data_format: string;
+      read_jsonl_info: string;
+      read_jsonl_entry: string;
+      export_entry_as: string;
     };
     openFile?: string | null;
   } = $props();
@@ -58,13 +64,25 @@
     source_format: string;
   }
 
+  interface JsonlInfo {
+    path: string;
+    entry_count: number;
+    size_bytes: number;
+  }
+
+  interface JsonlEntry {
+    index: number;
+    content: string;
+    entry_count: number;
+  }
+
   interface KvasTreeNode extends FileTreeEntry {
     expanded: boolean;
     children: KvasTreeNode[];
     loading: boolean;
   }
 
-  type ViewTab = "code" | "data" | "preview" | "inspect";
+  type ViewTab = "code" | "data" | "preview" | "inspect" | "jsonl";
   type DataFormat = "json" | "yaml" | "toml" | "toon";
 
   let directory = $state("");
@@ -82,6 +100,30 @@
   let isSchemaFile = $state(false);
   let inspectedSchema: InspectedSchema | null = $state(null);
   let showHidden = $state(false);
+
+  type WrapMode = "nowrap" | "wrap79" | "wrapwidth";
+  let wrapMode: WrapMode = $state("nowrap");
+
+  function cycleWrap() {
+    if (wrapMode === "nowrap") wrapMode = "wrap79";
+    else if (wrapMode === "wrap79") wrapMode = "wrapwidth";
+    else wrapMode = "nowrap";
+  }
+
+  function wrapLabel(): string {
+    if (wrapMode === "nowrap") return "no wrap";
+    if (wrapMode === "wrap79") return "wrap 79";
+    return "wrap fit";
+  }
+
+  // JSONL viewer state
+  let isJsonlFile = $state(false);
+  let jsonlInfo: JsonlInfo | null = $state(null);
+  let jsonlEntry: JsonlEntry | null = $state(null);
+  let jsonlFormat: DataFormat = $state("json");
+  let jsonlConverted: AllFormats | null = $state(null);
+  let scrubberIndex = $state(0);
+  let scrubTimer: ReturnType<typeof setTimeout> | null = null;
 
   async function selectDirectory() {
     const selected = await open({
@@ -186,6 +228,28 @@
 
       // Check if it's a data file and load conversions
       const format = await invoke<string | null>(commands.detect_data_format, { path });
+
+      // JSONL gets its own viewer
+      isJsonlFile = format === "jsonl";
+      if (isJsonlFile) {
+        isDataFile = false;
+        jsonlInfo = await invoke<JsonlInfo>(commands.read_jsonl_info, { path });
+        if (jsonlInfo.entry_count > 0) {
+          jsonlEntry = await invoke<JsonlEntry>(commands.read_jsonl_entry, {
+            path,
+            index: jsonlInfo.entry_count - 1,
+          });
+          scrubberIndex = jsonlInfo.entry_count - 1;
+        } else {
+          jsonlEntry = null;
+          scrubberIndex = 0;
+        }
+        jsonlFormat = "json";
+        jsonlConverted = null;
+        activeTab = "jsonl";
+        return;
+      }
+
       isDataFile = format !== null;
 
       if (format && fileContent) {
@@ -219,6 +283,95 @@
     if (openFile) {
       loadFile(openFile);
     }
+  });
+
+  // ── JSONL navigation ─────────────────────────────────────────────────
+
+  async function jsonlNavigate(index: number) {
+    if (!selectedFile || !jsonlInfo) return;
+    if (index < 0 || index >= jsonlInfo.entry_count) return;
+    jsonlEntry = await invoke<JsonlEntry>(commands.read_jsonl_entry, {
+      path: selectedFile,
+      index,
+    });
+    scrubberIndex = index;
+    jsonlConverted = null;
+    if (jsonlFormat !== "json") {
+      await convertJsonlEntry();
+    }
+  }
+
+  function jsonlFirst() { jsonlNavigate(0); }
+  function jsonlPrev() { if (jsonlEntry) jsonlNavigate(jsonlEntry.index - 1); }
+  function jsonlNext() { if (jsonlEntry) jsonlNavigate(jsonlEntry.index + 1); }
+  function jsonlLast() { if (jsonlInfo) jsonlNavigate(jsonlInfo.entry_count - 1); }
+
+  function handleScrub(e: Event) {
+    const target = e.target as HTMLInputElement;
+    scrubberIndex = parseInt(target.value);
+    if (scrubTimer) clearTimeout(scrubTimer);
+    scrubTimer = setTimeout(() => {
+      jsonlNavigate(scrubberIndex);
+    }, 1000);
+  }
+
+  async function convertJsonlEntry() {
+    if (!jsonlEntry || jsonlFormat === "json") {
+      jsonlConverted = null;
+      return;
+    }
+    jsonlConverted = await invoke<AllFormats>(commands.convert_to_all_formats, {
+      content: jsonlEntry.content,
+      sourceFormat: "json",
+    });
+  }
+
+  async function exportJsonlEntry() {
+    if (!jsonlEntry || !selectedFile) return;
+    const sourceName = selectedFile.split("/").pop()?.replace(".jsonl", "") || "entry";
+    const tempPath = await invoke<string>(commands.export_entry_as, {
+      content: jsonlEntry.content,
+      format: jsonlFormat,
+      sourceName,
+      index: jsonlEntry.index,
+    });
+    await invoke(commands.open_in_editor, { path: tempPath, line: 1 });
+  }
+
+  let jsonlDisplayContent = $derived.by(() => {
+    if (!jsonlEntry) return "";
+    if (jsonlFormat === "json") return jsonlEntry.content;
+    if (jsonlConverted) {
+      const fmt = jsonlConverted[jsonlFormat as keyof Pick<AllFormats, "json" | "yaml" | "toml" | "toon">];
+      return fmt?.content || jsonlEntry.content;
+    }
+    return jsonlEntry.content;
+  });
+
+  let jsonlHighlighted = $derived.by(() => {
+    if (!jsonlDisplayContent) return "";
+    const lang = jsonlFormat === "toon" ? "yaml" : jsonlFormat;
+    const hljsLang = getHljsLanguage(lang);
+    try {
+      return hljs.highlight(jsonlDisplayContent, { language: hljsLang }).value;
+    } catch {
+      return hljs.highlightAuto(jsonlDisplayContent).value;
+    }
+  });
+
+  function handleJsonlKeydown(e: KeyboardEvent) {
+    if (activeTab !== "jsonl") return;
+    switch (e.key) {
+      case "ArrowUp": e.preventDefault(); jsonlPrev(); break;
+      case "ArrowDown": e.preventDefault(); jsonlNext(); break;
+      case "ArrowLeft": e.preventDefault(); jsonlFirst(); break;
+      case "ArrowRight": e.preventDefault(); jsonlLast(); break;
+    }
+  }
+
+  $effect(() => {
+    window.addEventListener("keydown", handleJsonlKeydown);
+    return () => window.removeEventListener("keydown", handleJsonlKeydown);
   });
 
   async function openInEditor(line: number = 1) {
@@ -447,6 +600,23 @@
             Inspect
           </button>
         {/if}
+        {#if isJsonlFile}
+          <button
+            class="tab"
+            class:active={activeTab === "jsonl"}
+            onclick={() => activeTab = "jsonl"}
+          >
+            JSONL
+          </button>
+        {/if}
+        <button
+          class="tab wrap-toggle"
+          class:active={wrapMode !== "nowrap"}
+          onclick={cycleWrap}
+          title="Cycle: no wrap → wrap 79 → wrap to width"
+        >
+          {wrapLabel()}
+        </button>
       </section>
 
       <!-- Data view format selector and token stats -->
@@ -485,8 +655,61 @@
         </section>
       {/if}
 
+      <!-- JSONL viewer -->
+      {#if activeTab === "jsonl" && jsonlInfo}
+        <section class="jsonl-controls">
+          <div class="jsonl-nav">
+            <button class="nav-btn" onclick={jsonlFirst} disabled={!jsonlEntry || jsonlEntry.index === 0}
+              title="First entry (Left arrow)">&#9664;</button>
+            <button class="nav-btn" onclick={jsonlPrev} disabled={!jsonlEntry || jsonlEntry.index === 0}
+              title="Previous entry (Up arrow)">&#9650;</button>
+            <button class="nav-btn" onclick={jsonlNext} disabled={!jsonlEntry || jsonlEntry.index >= jsonlInfo.entry_count - 1}
+              title="Next entry (Down arrow)">&#9660;</button>
+            <button class="nav-btn" onclick={jsonlLast} disabled={!jsonlEntry || jsonlEntry.index >= jsonlInfo.entry_count - 1}
+              title="Last entry (Right arrow)">&#9654;</button>
+            <span class="jsonl-position">
+              {scrubberIndex + 1} / {jsonlInfo.entry_count.toLocaleString()}
+            </span>
+          </div>
+          {#if jsonlInfo.entry_count > 1}
+            <input
+              type="range"
+              class="jsonl-scrubber"
+              min={0}
+              max={jsonlInfo.entry_count - 1}
+              value={scrubberIndex}
+              oninput={handleScrub}
+            />
+          {/if}
+          <div class="jsonl-right">
+            <div class="format-selector">
+              {#each ["json", "yaml", "toml", "toon"] as fmt}
+                <button
+                  class="format-btn"
+                  class:active={jsonlFormat === fmt}
+                  onclick={() => { jsonlFormat = fmt as DataFormat; convertJsonlEntry(); }}
+                >
+                  {fmt.toUpperCase()}
+                </button>
+              {/each}
+            </div>
+            <Button variant="ghost" onclick={exportJsonlEntry}>Open in Editor</Button>
+          </div>
+        </section>
+
+        {#if jsonlEntry}
+          <section class="code-viewer" class:wrap79={wrapMode === "wrap79"} class:wrapwidth={wrapMode === "wrapwidth"}>
+            <pre><code>{#each jsonlDisplayContent.split('\n') as line, i}{@const highlighted = jsonlHighlighted.split('\n')[i] || ''}<span class="line-number">{i + 1}</span><span class="line-content">{@html highlighted}</span>
+{/each}</code></pre>
+          </section>
+        {:else}
+          <section class="empty-state">
+            <p>Empty JSONL file</p>
+          </section>
+        {/if}
+
       <!-- Schema Inspector -->
-      {#if activeTab === "inspect" && inspectedSchema}
+      {:else if activeTab === "inspect" && inspectedSchema}
         <section class="inspector-view">
           <SchemaInspector schema={inspectedSchema} />
         </section>
@@ -494,7 +717,7 @@
       {:else if activeTab === "preview" && isMarkdownFile}
         <MarkdownPreview content={renderedMarkdown} />
       {:else}
-        <section class="code-viewer">
+        <section class="code-viewer" class:wrap79={wrapMode === "wrap79"} class:wrapwidth={wrapMode === "wrapwidth"}>
           <pre><code>{#each displayContent.split('\n') as line, i}{@const highlighted = highlightedContent.split('\n')[i] || ''}<span class="line-number">{i + 1}</span><span class="line-content">{@html highlighted}</span>
 {/each}</code></pre>
         </section>
@@ -758,6 +981,24 @@
     white-space: pre;
   }
 
+  .code-viewer.wrap79 .line-content,
+  .code-viewer.wrapwidth .line-content {
+    white-space: pre-wrap;
+    word-break: break-word;
+    display: inline-block;
+    vertical-align: top;
+  }
+
+  .code-viewer.wrap79 .line-content {
+    max-width: 79ch;
+  }
+
+  .wrap-toggle {
+    margin-left: auto;
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+  }
+
   .inspector-view {
     background: var(--bg-secondary);
     border-radius: var(--radius-md);
@@ -768,5 +1009,76 @@
     text-align: center;
     padding: 4rem var(--space-3xl);
     color: var(--text-secondary);
+  }
+
+  /* JSONL controls */
+  .jsonl-controls {
+    background: var(--bg-secondary);
+    padding: var(--space-lg);
+    border-radius: var(--radius-md);
+    margin-bottom: var(--space-lg);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+  }
+
+  .jsonl-nav {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+  }
+
+  .nav-btn {
+    padding: var(--space-xs) var(--space-md);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-sm);
+    background: var(--action-neutral);
+    color: var(--text-primary);
+    cursor: pointer;
+    font-size: var(--text-sm);
+    line-height: 1;
+  }
+
+  .nav-btn:hover:not(:disabled) {
+    background: var(--action-neutral-hover);
+  }
+
+  .nav-btn:disabled {
+    opacity: 0.3;
+    cursor: default;
+  }
+
+  .jsonl-position {
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+    color: var(--text-secondary);
+    margin-left: var(--space-md);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .jsonl-scrubber {
+    width: 100%;
+    height: 4px;
+    appearance: none;
+    background: var(--bg-tertiary);
+    border-radius: 2px;
+    outline: none;
+    cursor: pointer;
+  }
+
+  .jsonl-scrubber::-webkit-slider-thumb {
+    appearance: none;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--action-primary);
+    cursor: pointer;
+  }
+
+  .jsonl-right {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-lg);
   }
 </style>

@@ -73,6 +73,9 @@
           open_in_editor: "kvas_open_in_editor",
           convert_to_all_formats: "kvas_convert_to_all_formats",
           detect_data_format: "kvas_detect_data_format",
+          read_jsonl_info: "kvas_read_jsonl_info",
+          read_jsonl_entry: "kvas_read_jsonl_entry",
+          export_entry_as: "kvas_export_entry_as",
         }} openFile={openFilePath} />
       </div>
     {/if}

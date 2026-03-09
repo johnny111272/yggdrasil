@@ -15,11 +15,14 @@ members = [
 
 [workspace.dependencies]
 socket_emit = { path = "../nornir/capability/socket_emit" }
+format_core = { path = "../nornir/core/format_core" }
+error_core = { path = "../nornir/core/error_core" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 serde_yaml = "0.9"
 toml = "0.8"
 serde_toon2 = "0.1"
+toon-format = "0.4"
 glob = "0.3"
 dirs = "5"
 tokio = { version = "1", features = ["net", "io-util", "rt-multi-thread", "sync", "time"] }

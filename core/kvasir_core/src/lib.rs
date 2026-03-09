@@ -38,6 +38,20 @@ pub struct AllFormats {
     pub source_format: String,
 }
 
+#[derive(Debug, Clone, Serialize)]
+pub struct JsonlInfo {
+    pub path: String,
+    pub entry_count: usize,
+    pub size_bytes: u64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct JsonlEntry {
+    pub index: usize,
+    pub content: String,
+    pub entry_count: usize,
+}
+
 // ============================================================================
 // Public Functions
 // ============================================================================
@@ -131,37 +145,26 @@ pub fn read_file(path: &str) -> Result<FileContent, String> {
 pub use common_core::open_in_editor;
 
 pub fn convert_to_all_formats(content: &str, source_format: &str) -> Result<AllFormats, String> {
+    use format_core::{parse, serialize, convert::strip_nulls};
+
     let value: serde_json::Value = match source_format {
-        "json" => serde_json::from_str(content)
-            .map_err(|e| format!("Invalid JSON: {}", e))?,
-        "yaml" => serde_yaml::from_str(content)
-            .map_err(|e| format!("Invalid YAML: {}", e))?,
-        "toml" => {
-            let toml_value: toml::Value = toml::from_str(content)
-                .map_err(|e| format!("Invalid TOML: {}", e))?;
-            serde_json::to_value(toml_value)
-                .map_err(|e| format!("TOML conversion error: {}", e))?
-        },
-        "toon" => serde_toon2::from_str(content)
-            .map_err(|e| format!("Invalid TOON: {}", e))?,
+        "json" => parse::json(content).map_err(|e| e.to_string())?,
+        "yaml" => parse::yaml(content).map_err(|e| e.to_string())?,
+        "toml" => parse::toml(content).map_err(|e| e.to_string())?,
+        "toon" => parse::toon(content).map_err(|e| e.to_string())?,
         _ => return Err(format!("Unsupported format: {}", source_format)),
     };
 
-    let json_content = serde_json::to_string_pretty(&value)
-        .map_err(|e| format!("JSON serialization error: {}", e))?;
+    let json_content = serialize::to_json(&value).map_err(|e| e.to_string())?;
+    let yaml_content = serialize::to_yaml(&value).map_err(|e| e.to_string())?;
 
-    let yaml_content = serde_yaml::to_string(&value)
-        .map_err(|e| format!("YAML serialization error: {}", e))?;
+    // Strip nulls before TOML serialization — TOML cannot represent null
+    let toml_safe = strip_nulls(value.clone());
+    let toml_content = serialize::to_toml(&toml_safe)
+        .unwrap_or_else(|e| format!("# TOML: {}", e));
 
-    let toml_content = match toml::to_string_pretty(&value) {
-        Ok(s) => s,
-        Err(_) => "# TOML conversion not supported for this structure".to_string(),
-    };
-
-    let toon_content = match serde_toon2::to_string(&value) {
-        Ok(s) => s,
-        Err(_) => "# TOON conversion not supported for this structure".to_string(),
-    };
+    let toon_content = serialize::to_toon(&value)
+        .unwrap_or_else(|e| format!("# TOON: {}", e));
 
     Ok(AllFormats {
         json: FormatConversion {
@@ -189,11 +192,94 @@ pub fn detect_data_format(path: &str) -> Option<String> {
     let ext = effective_extension(file_path);
     match ext.as_str() {
         "json" | "jsonld" | "qa" | "meta" | "index" => Some("json".to_string()),
+        "jsonl" => Some("jsonl".to_string()),
         "yaml" | "yml" => Some("yaml".to_string()),
         "toml" => Some("toml".to_string()),
         "toon" => Some("toon".to_string()),
         _ => None,
     }
+}
+
+pub fn read_jsonl_info(path: &str) -> Result<JsonlInfo, String> {
+    let file_path = Path::new(path);
+    if !file_path.is_file() {
+        return Err(format!("Not a file: {}", path));
+    }
+    let metadata = std::fs::metadata(file_path)
+        .map_err(|e| format!("Failed to get metadata: {}", e))?;
+
+    let file = std::fs::File::open(file_path)
+        .map_err(|e| format!("Failed to open: {}", e))?;
+    let reader = std::io::BufReader::new(file);
+
+    use std::io::BufRead;
+    let entry_count = reader.lines().count();
+
+    Ok(JsonlInfo {
+        path: path.to_string(),
+        entry_count,
+        size_bytes: metadata.len(),
+    })
+}
+
+pub fn read_jsonl_entry(path: &str, index: usize) -> Result<JsonlEntry, String> {
+    let file_path = Path::new(path);
+    let file = std::fs::File::open(file_path)
+        .map_err(|e| format!("Failed to open: {}", e))?;
+    let reader = std::io::BufReader::new(file);
+
+    use std::io::BufRead;
+    let mut entry_count = 0;
+    let mut target_line = None;
+
+    for (i, line) in reader.lines().enumerate() {
+        let line = line.map_err(|e| format!("Read error at line {}: {}", i, e))?;
+        entry_count = i + 1;
+        if i == index {
+            target_line = Some(line);
+        }
+    }
+
+    let raw = target_line
+        .ok_or_else(|| format!("Index {} out of range (file has {} entries)", index, entry_count))?;
+
+    let value: serde_json::Value = serde_json::from_str(&raw)
+        .map_err(|e| format!("Invalid JSON at line {}: {}", index, e))?;
+    let content = serde_json::to_string_pretty(&value)
+        .map_err(|e| format!("Serialization error: {}", e))?;
+
+    Ok(JsonlEntry {
+        index,
+        content,
+        entry_count,
+    })
+}
+
+pub fn export_entry_as(
+    content: &str,
+    format: &str,
+    source_name: &str,
+    index: usize,
+) -> Result<String, String> {
+    let converted = if format == "json" {
+        content.to_string()
+    } else {
+        let all = convert_to_all_formats(content, "json")?;
+        match format {
+            "yaml" => all.yaml.content,
+            "toml" => all.toml.content,
+            "toon" => all.toon.content,
+            _ => return Err(format!("Unknown format: {}", format)),
+        }
+    };
+
+    let filename = format!("kvasir-{}-{}.{}", source_name, index, format);
+    let path = std::env::temp_dir().join(filename);
+
+    std::fs::write(&path, &converted)
+        .map_err(|e| format!("Failed to write temp file: {}", e))?;
+
+    Ok(path.to_string_lossy().to_string())
 }
 
 // ============================================================================
@@ -231,7 +317,7 @@ fn detect_language(extension: &str) -> String {
         "css" => "css",
         "scss" => "scss",
         "less" => "less",
-        "json" | "jsonld" | "qa" | "meta" | "index" => "json",
+        "json" | "jsonld" | "qa" | "meta" | "index" | "jsonl" => "json",
         "yaml" | "yml" => "yaml",
         "toml" => "toml",
         "md" | "markdown" => "markdown",
