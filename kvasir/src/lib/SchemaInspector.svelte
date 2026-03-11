@@ -30,16 +30,14 @@
     collapsedSections = next;
   }
 
-  function reqLabel(req: { label: string; cssClass: string }): { label: string; cssClass: string; condCount: number } {
-    const label = req.label;
-    const parts = label.split(" + ");
-    const condParts = parts.filter(p => p.includes("WHEN"));
-    const condCount = condParts.length;
-    if (showConditionals) return { ...req, condCount: 0 };
-    if (condCount === 0) return { ...req, condCount: 0 };
-    const kept = parts.filter(p => !p.includes("WHEN"));
+  function reqLabel(requirement: { label: string; cssClass: string }): { label: string; cssClass: string; condCount: number } {
+    const parts = requirement.label.split(" + ");
+    const condCount = parts.filter(part => part.includes("WHEN")).length;
+    if (showConditionals) return { ...requirement, condCount: 0 };
+    if (condCount === 0) return { ...requirement, condCount: 0 };
+    const kept = parts.filter(part => !part.includes("WHEN"));
     if (kept.length === 0) return { label: "CONDITIONAL", cssClass: "req-conditional", condCount };
-    return { label: kept.join(" + "), cssClass: kept.some(p => p === "REQUIRED") ? "req-required" : req.cssClass, condCount };
+    return { label: kept.join(" + "), cssClass: kept.some(part => part === "REQUIRED") ? "req-required" : requirement.cssClass, condCount };
   }
 </script>
 
@@ -375,8 +373,8 @@
     width: 12px;
   }
 
-  .section-name { color: #7aa2f7; }
-  .section-nullable { color: #bb9af7; font-weight: 400; font-size: 0.8rem; }
+  .section-name { color: var(--syntax-identifier); }
+  .section-nullable { color: var(--syntax-annotation); font-weight: 400; font-size: 0.8rem; }
 
   .cross-group-header { cursor: default; }
   .cross-group-header:hover { background: none; }
@@ -393,10 +391,10 @@
   .line { white-space: pre-wrap; padding: 1px 0; }
 
   .field-name { color: var(--text-primary); }
-  .group-name { color: #7aa2f7; font-weight: 600; }
-  .field-type { color: #7dcfff; }
-  .field-default { color: #9ece6a; }
-  .alt-label { color: #bb9af7; }
+  .group-name { color: var(--syntax-identifier); font-weight: 600; }
+  .field-type { color: var(--syntax-keyword); }
+  .field-default { color: var(--syntax-value); }
+  .alt-label { color: var(--syntax-annotation); }
   .note { color: var(--text-secondary); font-size: 0.8rem; }
 
   .field-desc {
@@ -406,21 +404,21 @@
   }
   .desc-text { color: var(--text-secondary); }
 
-  .req-required { color: #9ece6a; }
+  .req-required { color: var(--syntax-value); }
   .req-optional { color: var(--text-secondary); }
-  .req-oneof { color: #bb9af7; }
-  .req-conditional { color: #e0af68; }
+  .req-oneof { color: var(--syntax-annotation); }
+  .req-conditional { color: var(--syntax-conditional); }
 
   .ext {
     font-size: 0.78rem;
     margin-left: 4px;
   }
 
-  .ext-format { color: #bb9af7; }
-  .ext-excludes { color: #f7768e; }
-  .ext-semantic { color: #e0af68; }
-  .ext-constraint { color: #73daca; }
-  .ext-conditional { color: #e0af68; }
+  .ext-format { color: var(--syntax-annotation); }
+  .ext-excludes { color: var(--syntax-error); }
+  .ext-semantic { color: var(--syntax-conditional); }
+  .ext-constraint { color: var(--syntax-constraint); }
+  .ext-conditional { color: var(--syntax-conditional); }
 
   .badge-btn {
     background: none;
@@ -441,8 +439,8 @@
     opacity: 1;
   }
 
-  .sev-error { color: #f7768e; }
-  .sev-warning { color: #e0af68; }
+  .sev-error { color: var(--syntax-error); }
+  .sev-warning { color: var(--syntax-conditional); }
 
   .ext-panel {
     font-size: 0.78rem;
@@ -451,16 +449,16 @@
   }
 
   .ext-panel-semantic { border-left: 2px solid var(--border-default); padding-left: var(--space-md); }
-  .ext-panel-semantic.sev-error { border-left-color: #f7768e; }
-  .ext-panel-semantic.sev-warning { border-left-color: #e0af68; }
+  .ext-panel-semantic.sev-error { border-left-color: var(--syntax-error); }
+  .ext-panel-semantic.sev-warning { border-left-color: var(--syntax-conditional); }
 
-  .ext-panel-constraint { border-left: 2px solid #73daca; padding-left: var(--space-md); }
-  .ext-panel-excludes { border-left: 2px solid #f7768e; padding-left: var(--space-md); }
+  .ext-panel-constraint { border-left: 2px solid var(--syntax-constraint); padding-left: var(--space-md); }
+  .ext-panel-excludes { border-left: 2px solid var(--syntax-error); padding-left: var(--space-md); }
 
   .panel-row { white-space: pre-wrap; }
   .panel-key { color: var(--text-secondary); font-weight: 600; }
-  .panel-check { color: #9ece6a; }
-  .panel-anti { color: #f7768e; }
+  .panel-check { color: var(--syntax-value); }
+  .panel-anti { color: var(--syntax-error); }
   .panel-rule { font-weight: 600; }
-  .panel-exclude { color: #f7768e; font-weight: bold; }
+  .panel-exclude { color: var(--syntax-error); font-weight: bold; }
 </style>

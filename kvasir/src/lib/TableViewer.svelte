@@ -27,8 +27,8 @@
     if (!tableData) return [];
     if (!filterText.trim()) return tableData.rows;
     const needle = filterText.toLowerCase();
-    return tableData.rows.filter((row) =>
-      row.some((cell) => cell.toLowerCase().includes(needle)),
+    return tableData.rows.filter((cells) =>
+      cells.some((cell) => cell.toLowerCase().includes(needle)),
     );
   });
 
@@ -36,9 +36,9 @@
     if (sortColumn === null || sortDirection === null) return filteredRows;
     const col = sortColumn;
     const dir = sortDirection === "asc" ? 1 : -1;
-    return [...filteredRows].sort((a, b) => {
-      const va = a[col] ?? "";
-      const vb = b[col] ?? "";
+    return [...filteredRows].sort((rowA, rowB) => {
+      const va = rowA[col] ?? "";
+      const vb = rowB[col] ?? "";
       const na = Number(va);
       const nb = Number(vb);
       if (!isNaN(na) && !isNaN(nb) && va !== "" && vb !== "") {

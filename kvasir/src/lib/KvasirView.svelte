@@ -183,8 +183,8 @@
             children: [],
             loading: false,
           }));
-        } catch (e) {
-          console.error("Failed to load children:", e);
+        } catch (err) {
+          error = String(err);
         }
         node.loading = false;
       }
@@ -199,78 +199,63 @@
 
   // ── File loading ───────────────────────────────────────────────────────
 
+  function resetFileFlags() {
+    fileContent = null;
+    dataFormats = null;
+    isDataFile = false;
+    isMarkdownFile = false;
+    isSchemaFile = false;
+    isJsonlFile = false;
+    isTableFile = false;
+    inspectedSchema = null;
+  }
+
+  async function loadRegularFile(path: string, format: string | null) {
+    fileContent = await invoke<FileContent>(commands.read_file, { path });
+
+    isMarkdownFile = fileContent.language === "markdown";
+    isSchemaFile = path.endsWith(".schema.json");
+
+    if (isSchemaFile) {
+      try { inspectedSchema = analyzeSchema(fileContent.content); }
+      catch { inspectedSchema = null; }
+    }
+
+    isDataFile = format !== null;
+    if (format) {
+      selectedFormat = format as DataFormat;
+      try {
+        dataFormats = await invoke<AllFormats>(commands.convert_to_all_formats, {
+          content: fileContent.content,
+          sourceFormat: format,
+        });
+      } catch { dataFormats = null; }
+    }
+
+    if (isSchemaFile && inspectedSchema) activeTab = "inspect";
+    else if (isMarkdownFile) activeTab = "preview";
+    else activeTab = "code";
+  }
+
   async function loadFile(path: string) {
     selectedFile = path;
     error = "";
-    dataFormats = null;
+    resetFileFlags();
 
     try {
-      // Detect format first — JSONL skips read_file entirely
       const format = await invoke<string | null>(commands.detect_data_format, { path });
 
-      isJsonlFile = format === "jsonl";
-      isTableFile = format === "csv" || format === "tsv" || format === "parquet";
-
-      if (isJsonlFile) {
-        fileContent = null;
-        isDataFile = false;
-        isMarkdownFile = false;
-        isSchemaFile = false;
-        isTableFile = false;
-        inspectedSchema = null;
+      if (format === "jsonl") {
+        isJsonlFile = true;
         activeTab = "jsonl";
-        return;
-      }
-
-      if (isTableFile) {
-        fileContent = null;
-        isDataFile = false;
-        isMarkdownFile = false;
-        isSchemaFile = false;
-        isJsonlFile = false;
-        inspectedSchema = null;
+      } else if (format === "csv" || format === "tsv" || format === "parquet") {
+        isTableFile = true;
         activeTab = "table";
-        return;
-      }
-
-      fileContent = await invoke<FileContent>(commands.read_file, { path });
-
-      isMarkdownFile = fileContent.language === "markdown";
-
-      isSchemaFile = path.endsWith(".schema.json");
-      inspectedSchema = null;
-      if (isSchemaFile && fileContent) {
-        try {
-          inspectedSchema = analyzeSchema(fileContent.content);
-        } catch (e) {
-          console.error("Schema inspection failed:", e);
-        }
-      }
-
-      isDataFile = format !== null;
-
-      if (format && fileContent) {
-        selectedFormat = format as DataFormat;
-        try {
-          dataFormats = await invoke<AllFormats>(commands.convert_to_all_formats, {
-            content: fileContent.content,
-            sourceFormat: format,
-          });
-        } catch (e) {
-          console.error("Format conversion failed:", e);
-        }
-      }
-
-      if (isSchemaFile && inspectedSchema) {
-        activeTab = "inspect";
-      } else if (isMarkdownFile) {
-        activeTab = "preview";
       } else {
-        activeTab = "code";
+        await loadRegularFile(path, format);
       }
-    } catch (e) {
-      error = String(e);
-      fileContent = null;
+    } catch (err) {
+      error = String(err);
     }
   }
 
@@ -290,11 +275,7 @@
 
   async function openInEditor(line: number = 1) {
     if (!selectedFile) return;
-    try {
-      await invoke(commands.open_in_editor, { path: selectedFile, line });
-    } catch (e) {
-      console.error("Failed to open in editor:", e);
-    }
+    await invoke(commands.open_in_editor, { path: selectedFile, line });
   }
 
   function relativePath(fullPath: string): string {

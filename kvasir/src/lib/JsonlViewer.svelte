@@ -94,8 +94,8 @@
   function next() { if (jsonlEntry) navigate(jsonlEntry.index + 1); }
   function last() { if (jsonlInfo) navigate(jsonlInfo.entry_count - 1); }
 
-  function handleScrub(e: Event) {
-    const target = e.target as HTMLInputElement;
+  function handleScrub(event: Event) {
+    const target = event.target as HTMLInputElement;
     scrubberIndex = parseInt(target.value);
     if (scrubTimer) clearTimeout(scrubTimer);
     scrubTimer = setTimeout(() => {
@@ -147,12 +147,12 @@
     }
   });
 
-  function handleKeydown(e: KeyboardEvent) {
-    switch (e.key) {
-      case "ArrowUp": e.preventDefault(); prev(); break;
-      case "ArrowDown": e.preventDefault(); next(); break;
-      case "ArrowLeft": e.preventDefault(); first(); break;
-      case "ArrowRight": e.preventDefault(); last(); break;
+  function handleKeydown(event: KeyboardEvent) {
+    switch (event.key) {
+      case "ArrowUp": event.preventDefault(); prev(); break;
+      case "ArrowDown": event.preventDefault(); next(); break;
+      case "ArrowLeft": event.preventDefault(); first(); break;
+      case "ArrowRight": event.preventDefault(); last(); break;
     }
   }
 
