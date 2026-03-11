@@ -1,6 +1,8 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
+  import { homeDir } from "@tauri-apps/api/path";
   import { open } from "@tauri-apps/plugin-dialog";
+  import { onMount } from "svelte";
   import { Button, SidebarLayout, TreeNode } from "@yggdrasil/ui";
   import hljs from "highlight.js";
   import "highlight.js/styles/github-dark.css";
@@ -8,6 +10,7 @@
   import MarkdownPreview from "./MarkdownPreview.svelte";
   import SchemaInspector from "./SchemaInspector.svelte";
   import JsonlViewer from "./JsonlViewer.svelte";
+  import TableViewer from "./TableViewer.svelte";
   import FormatControls from "./FormatControls.svelte";
   import { analyzeSchema, type InspectedSchema } from "./schema-inspect";
   import type { FileTreeEntry, FileContent, AllFormats, KvasTreeNode, ViewTab, DataFormat, WrapMode } from "./kvasir-types";
@@ -22,6 +25,8 @@
       read_jsonl_info: "read_jsonl_info",
       read_jsonl_entry: "read_jsonl_entry",
       export_entry_as: "export_entry_as",
+      read_table: "read_table",
+      export_table_csv: "export_table_csv",
     },
     openFile = null,
   }: {
@@ -34,6 +39,8 @@
       read_jsonl_info: string;
       read_jsonl_entry: string;
       export_entry_as: string;
+      read_table: string;
+      export_table_csv: string;
     };
     openFile?: string | null;
   } = $props();
@@ -54,9 +61,18 @@
   let isMarkdownFile = $state(false);
   let isSchemaFile = $state(false);
   let isJsonlFile = $state(false);
+  let isTableFile = $state(false);
   let inspectedSchema: InspectedSchema | null = $state(null);
   let showHidden = $state(false);
   let wrapMode: WrapMode = $state("nowrap");
+  let refreshKey = $state(0);
+  let fileView = $state(false);
+
+  function refresh() {
+    if (!selectedFile) return;
+    refreshKey++;
+    if (!isJsonlFile && !isTableFile) loadFile(selectedFile);
+  }
 
   function cycleWrap() {
     if (wrapMode === "nowrap") wrapMode = "wrap79";
@@ -69,6 +85,36 @@
     if (wrapMode === "wrap79") return "wrap 79";
     return "wrap fit";
   }
+
+  // ── Directory navigation ─────────────────────────────────────────────
+
+  function parentDir(path: string): string | null {
+    const i = path.lastIndexOf("/");
+    return i > 0 ? path.substring(0, i) : null;
+  }
+
+  function zoomToDirectory(path: string) {
+    directory = path;
+    selectedFile = null;
+    fileContent = null;
+    dataFormats = null;
+    isJsonlFile = false;
+    isTableFile = false;
+    loadTree();
+  }
+
+  function navigateUp() {
+    const parent = parentDir(directory);
+    if (parent) zoomToDirectory(parent);
+  }
+
+  onMount(async () => {
+    if (!openFile && !directory) {
+      const home = await homeDir();
+      directory = home + ".ai";
+      await loadTree();
+    }
+  });
 
   // ── Tree operations ────────────────────────────────────────────────────
 
@@ -163,13 +209,27 @@
       const format = await invoke<string | null>(commands.detect_data_format, { path });
 
       isJsonlFile = format === "jsonl";
+      isTableFile = format === "csv" || format === "tsv" || format === "parquet";
+
       if (isJsonlFile) {
         fileContent = null;
         isDataFile = false;
         isMarkdownFile = false;
         isSchemaFile = false;
+        isTableFile = false;
         inspectedSchema = null;
         activeTab = "jsonl";
+        return;
+      }
+
+      if (isTableFile) {
+        fileContent = null;
+        isDataFile = false;
+        isMarkdownFile = false;
+        isSchemaFile = false;
+        isJsonlFile = false;
+        inspectedSchema = null;
+        activeTab = "table";
         return;
       }
 
@@ -216,6 +276,12 @@
 
   $effect(() => {
     if (openFile) {
+      fileView = true;
+      const dir = parentDir(openFile);
+      if (dir && dir !== directory) {
+        directory = dir;
+        loadTree();
+      }
       loadFile(openFile);
     }
   });
@@ -333,8 +399,9 @@
   });
 </script>
 
-<SidebarLayout showSidebar={showTree} sidebarTitle="Files">
+<SidebarLayout showSidebar={!fileView && showTree} sidebarTitle="Files" fullWidth={fileView}>
   {#snippet headerExtra()}
+    <button class="up-btn" onclick={navigateUp} disabled={!directory} title="Up one level">&#8593;</button>
     <label class="dotfile-toggle" title="Show dotfiles">
       <input type="checkbox" bind:checked={showHidden} onchange={() => loadTree()} />
       <span class="dotfile-label">.*</span>
@@ -348,14 +415,16 @@
         selected={selectedFile}
         onToggle={handleTreeToggle}
         onSelect={handleTreeSelect}
+        onDblClickDir={zoomToDirectory}
         getIcon={getFileIcon}
       />
     {/if}
   {/snippet}
 
-  <header>
-    <h1><span class="app-name">KVASIR</span> <span class="separator">::</span> <span class="subtitle">Workspace Inspector</span></h1>
-  </header>
+  {#if !fileView}
+    <header>
+      <h1><span class="app-name">KVASIR</span> <span class="separator">::</span> <span class="subtitle">Workspace Inspector</span></h1>
+    </header>
 
     <section class="controls">
       <div class="directory-row">
@@ -372,6 +441,7 @@
         </Button>
       </div>
     </section>
+  {/if}
 
     {#if error}
       <section class="error-banner">
@@ -384,6 +454,10 @@
       <section class="file-info">
         <div class="file-path">
           <strong>{relativePath(selectedFile)}</strong>
+          <div class="file-actions">
+            <Button variant="ghost" onclick={() => fileView = !fileView}>{fileView ? "Browse" : "Focus"}</Button>
+            <Button variant="ghost" onclick={refresh}>Refresh</Button>
+          </div>
         </div>
       </section>
       <section class="tabs">
@@ -408,12 +482,40 @@
         path={selectedFile}
         {wrapMode}
         {getHljsLanguage}
+        {refreshKey}
+      />
+    {:else if isTableFile && selectedFile}
+      <!-- Table: independent path, no fileContent needed -->
+      <section class="file-info">
+        <div class="file-path">
+          <strong>{relativePath(selectedFile)}</strong>
+          <div class="file-actions">
+            <Button variant="ghost" onclick={() => fileView = !fileView}>{fileView ? "Browse" : "Focus"}</Button>
+            <Button variant="ghost" onclick={refresh}>Refresh</Button>
+          </div>
+        </div>
+      </section>
+      <section class="tabs">
+        <button class="tab active">Table</button>
+      </section>
+      <TableViewer
+        commands={{
+          read_table: commands.read_table,
+          export_table_csv: commands.export_table_csv,
+          open_in_editor: commands.open_in_editor,
+        }}
+        path={selectedFile}
+        {refreshKey}
       />
     {:else if fileContent}
       <section class="file-info">
         <div class="file-path">
           <strong>{relativePath(fileContent.path)}</strong>
-          <Button variant="ghost" onclick={() => openInEditor()}>Open in Editor</Button>
+          <div class="file-actions">
+            <Button variant="ghost" onclick={() => fileView = !fileView}>{fileView ? "Browse" : "Focus"}</Button>
+            <Button variant="ghost" onclick={refresh}>Refresh</Button>
+            <Button variant="ghost" onclick={() => openInEditor()}>Open in Editor</Button>
+          </div>
         </div>
         <div class="file-meta">
           <span class="meta-item">Language: <strong>{fileContent.language}</strong></span>
@@ -491,7 +593,7 @@
       <section class="empty-state">
         <p>Select a file from the tree to view its contents</p>
       </section>
-    {:else if !directory}
+    {:else if !directory && !fileView}
       <section class="empty-state">
         <p>Select a directory to browse files</p>
       </section>
@@ -499,6 +601,27 @@
 </SidebarLayout>
 
 <style>
+  .up-btn {
+    background: none;
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-sm);
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 0 var(--space-sm);
+    font-size: var(--text-sm);
+    line-height: 1.4;
+  }
+
+  .up-btn:hover:not(:disabled) {
+    color: var(--text-primary);
+    background: var(--bg-hover);
+  }
+
+  .up-btn:disabled {
+    opacity: 0.3;
+    cursor: default;
+  }
+
   .dotfile-toggle {
     display: flex;
     align-items: center;
@@ -595,6 +718,11 @@
     align-items: center;
     margin-bottom: var(--space-md);
     font-family: var(--font-mono);
+  }
+
+  .file-actions {
+    display: flex;
+    gap: var(--space-sm);
   }
 
   .file-meta {

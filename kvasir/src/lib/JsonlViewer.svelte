@@ -9,6 +9,7 @@
     path,
     wrapMode = "nowrap",
     getHljsLanguage,
+    refreshKey = 0,
   }: {
     commands: {
       read_jsonl_info: string;
@@ -20,6 +21,7 @@
     path: string;
     wrapMode?: WrapMode;
     getHljsLanguage: (lang: string) => string;
+    refreshKey?: number;
   } = $props();
 
   let jsonlInfo: JsonlInfo | null = $state(null);
@@ -49,6 +51,29 @@
     jsonlFormat = "json";
     jsonlConverted = null;
   }
+
+  async function reloadCurrent() {
+    if (!path) return;
+    jsonlInfo = await invoke<JsonlInfo>(commands.read_jsonl_info, { path });
+    if (jsonlInfo.entry_count === 0) {
+      jsonlEntry = null;
+      scrubberIndex = 0;
+      return;
+    }
+    const idx = Math.min(scrubberIndex, jsonlInfo.entry_count - 1);
+    jsonlEntry = await invoke<JsonlEntry>(commands.read_jsonl_entry, { path, index: idx });
+    scrubberIndex = idx;
+    if (jsonlFormat !== "json") {
+      await convertEntry();
+    } else {
+      jsonlConverted = null;
+    }
+  }
+
+  $effect(() => {
+    void refreshKey;
+    if (refreshKey > 0) reloadCurrent();
+  });
 
   async function navigate(index: number) {
     if (!path || !jsonlInfo) return;

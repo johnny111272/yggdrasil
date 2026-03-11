@@ -1,6 +1,8 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
+  import { homeDir } from "@tauri-apps/api/path";
   import { open } from "@tauri-apps/plugin-dialog";
+  import { onMount } from "svelte";
   import { Button, SidebarLayout, TreeNode, StatCard, SearchInput, FilterBanner } from "@yggdrasil/ui";
 
   let {
@@ -75,6 +77,32 @@
   let showTree = $state(true);
   let treeRoot: SvalTreeNode | null = $state(null);
   let selectedFile: string | null = $state(null);
+
+  function parentDir(path: string): string | null {
+    const i = path.lastIndexOf("/");
+    return i > 0 ? path.substring(0, i) : null;
+  }
+
+  function zoomToDirectory(path: string) {
+    directory = path;
+    selectedFile = null;
+    scanResult = null;
+    refresh();
+    loadTree();
+  }
+
+  function navigateUp() {
+    const parent = parentDir(directory);
+    if (parent) zoomToDirectory(parent);
+  }
+
+  onMount(async () => {
+    if (!directory) {
+      const home = await homeDir();
+      directory = home + ".ai";
+      await loadTree();
+    }
+  });
 
   async function selectDirectory() {
     const selected = await open({
@@ -251,7 +279,7 @@
       case "warning":
         return "var(--severity-warning)";
       default:
-        return "var(--severity-info)";
+        return "var(--severity-success)";
     }
   }
 
@@ -329,6 +357,10 @@
   sidebarTitle="Files"
   onCloseSidebar={() => showTree = false}
 >
+  {#snippet headerExtra()}
+    <button class="up-btn" onclick={navigateUp} disabled={!directory} title="Up one level">&#8593;</button>
+  {/snippet}
+
   {#snippet sidebar()}
     {#if treeRoot}
       <TreeNode
@@ -336,6 +368,7 @@
         selected={selectedFile}
         onToggle={handleTreeToggle}
         onSelect={handleTreeSelect}
+        onDblClickDir={zoomToDirectory}
         getBadgeCount={getFilteredCount}
         getBadgeSeverity={getMaxSeverity}
       />
@@ -478,6 +511,27 @@
 </SidebarLayout>
 
 <style>
+  .up-btn {
+    background: none;
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-sm);
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 0 var(--space-sm);
+    font-size: var(--text-sm);
+    line-height: 1.4;
+  }
+
+  .up-btn:hover:not(:disabled) {
+    color: var(--text-primary);
+    background: var(--bg-hover);
+  }
+
+  .up-btn:disabled {
+    opacity: 0.3;
+    cursor: default;
+  }
+
   header {
     text-align: center;
     margin-bottom: var(--space-2xl);
@@ -689,7 +743,7 @@
   }
 
   .issue-direction .detail-label {
-    color: var(--severity-info);
+    color: var(--action-primary);
   }
 
   .issue-canary .detail-label {
@@ -701,7 +755,7 @@
   }
 
   .issue-file {
-    color: var(--severity-info);
+    color: var(--action-primary);
   }
 
   .issue-line {

@@ -18,6 +18,7 @@
     badgeSeverity?: "blocked" | "error" | "warning" | "info" | "neutral";
     onToggle?: (path: string) => void;
     onSelect?: (path: string) => void;
+    onDblClickDir?: (path: string) => void;
     getBadgeCount?: (path: string, isDir: boolean) => number;
     getBadgeSeverity?: (path: string, isDir: boolean) => string;
     getIcon?: (path: string, isDir: boolean) => string;
@@ -29,6 +30,7 @@
     selected = null,
     onToggle,
     onSelect,
+    onDblClickDir,
     getBadgeCount,
     getBadgeSeverity,
     getIcon: getIconProp,
@@ -40,6 +42,10 @@
     } else {
       onSelect?.(node.path);
     }
+  }
+
+  function handleDblClick() {
+    if (node.is_dir) onDblClickDir?.(node.path);
   }
 
   function handleKeydown(e: KeyboardEvent) {
@@ -64,6 +70,7 @@
   class:selected={selected === node.path}
   style="padding-left: {depth * 16 + 8}px"
   onclick={handleClick}
+  ondblclick={handleDblClick}
   onkeydown={handleKeydown}
   role="button"
   tabindex="0"
@@ -83,6 +90,7 @@
       {selected}
       {onToggle}
       {onSelect}
+      {onDblClickDir}
       {getBadgeCount}
       {getBadgeSeverity}
       getIcon={getIconProp}

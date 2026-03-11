@@ -8,6 +8,7 @@
     sidebar?: Snippet;
     children?: Snippet;
     headerExtra?: Snippet;
+    fullWidth?: boolean;
     minWidth?: number;
     maxWidth?: number;
   }
@@ -19,6 +20,7 @@
     sidebar,
     children,
     headerExtra,
+    fullWidth = false,
     minWidth = 180,
     maxWidth = 600,
   }: Props = $props();
@@ -71,7 +73,7 @@
     </aside>
   {/if}
 
-  <div class="main-content" style={showSidebar ? `margin-left: ${sidebarWidth}px` : ''}>
+  <div class="main-content" class:full-width={fullWidth} style={showSidebar ? `margin-left: ${sidebarWidth}px` : ''}>
     {#if children}
       {@render children()}
     {/if}
@@ -161,5 +163,9 @@
     margin: 0 auto;
     padding: var(--space-3xl);
     overflow-y: auto;
+  }
+
+  .main-content.full-width {
+    max-width: none;
   }
 </style>
