@@ -7,8 +7,8 @@
 
   let { value, label, severity = "neutral" }: Props = $props();
 
-  function getColor(sev: string): string {
-    switch (sev) {
+  function getColor(level: string): string {
+    switch (level) {
       case "blocked": return "var(--severity-blocked)";
       case "error": return "var(--severity-error)";
       case "warning": return "var(--severity-warning)";

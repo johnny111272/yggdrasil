@@ -8,8 +8,8 @@
 
   let { onclick, children }: Props = $props();
 
-  function handleKeydown(e: KeyboardEvent) {
-    if (e.key === "Enter") onclick?.();
+  function handleKeydown(event: KeyboardEvent) {
+    if (event.key === "Enter") onclick?.();
   }
 </script>
 

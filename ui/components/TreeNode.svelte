@@ -48,8 +48,8 @@
     if (node.is_dir) onDblClickDir?.(node.path);
   }
 
-  function handleKeydown(e: KeyboardEvent) {
-    if (e.key === "Enter") handleClick();
+  function handleKeydown(event: KeyboardEvent) {
+    if (event.key === "Enter") handleClick();
   }
 
   function getIcon(): string {

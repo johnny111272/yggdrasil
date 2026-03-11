@@ -28,15 +28,15 @@
   let sidebarWidth = $state(280);
   let dragging = $state(false);
 
-  function onPointerDown(e: PointerEvent) {
+  function onPointerDown(event: PointerEvent) {
     dragging = true;
-    (e.target as HTMLElement).setPointerCapture(e.pointerId);
-    e.preventDefault();
+    (event.target as HTMLElement).setPointerCapture(event.pointerId);
+    event.preventDefault();
   }
 
-  function onPointerMove(e: PointerEvent) {
+  function onPointerMove(event: PointerEvent) {
     if (!dragging) return;
-    const clamped = Math.min(maxWidth, Math.max(minWidth, e.clientX));
+    const clamped = Math.min(maxWidth, Math.max(minWidth, event.clientX));
     sidebarWidth = clamped;
   }
 
