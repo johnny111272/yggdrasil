@@ -9,12 +9,12 @@ struct PendingFile(Mutex<Option<String>>);
 // ============================================================================
 
 #[tauri::command]
-async fn hlid_start_monitor(app: tauri::AppHandle) -> Result<(), String> {
+async fn hlid_start_monitor(app_handle: tauri::AppHandle) -> Result<(), String> {
     let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
     hlidskjalf_core::start_all(tx).await?;
     tokio::spawn(async move {
         while let Some(event) = rx.recv().await {
-            let _ = app.emit("datagram", &event);
+            let _ = app_handle.emit("datagram", &event);
         }
     });
     Ok(())
@@ -54,8 +54,8 @@ fn sval_list_qa_tree(directory: String) -> Result<Vec<svalinn_core::SvalFileTree
 // ============================================================================
 
 #[tauri::command]
-fn kvas_list_directory(directory: String) -> Result<Vec<kvasir_core::KvasFileTreeEntry>, String> {
-    kvasir_core::list_directory(&directory)
+fn kvas_list_directory(directory: String, show_hidden: bool) -> Result<Vec<kvasir_core::KvasFileTreeEntry>, String> {
+    kvasir_core::list_directory(&directory, show_hidden)
 }
 
 #[tauri::command]
@@ -93,6 +93,16 @@ fn kvas_export_entry_as(content: String, format: String, source_name: String, in
     kvasir_core::export_entry_as(&content, &format, &source_name, index)
 }
 
+#[tauri::command]
+fn kvas_read_table(path: String) -> Result<kvasir_core::TableData, String> {
+    kvasir_core::read_table(&path)
+}
+
+#[tauri::command]
+fn kvas_export_table_csv(headers: Vec<String>, rows: Vec<Vec<String>>, source_path: String) -> Result<String, String> {
+    kvasir_core::export_table_csv(headers, rows, &source_path)
+}
+
 // ============================================================================
 // Ratatoskr commands (rata_ prefix)
 // ============================================================================
@@ -123,7 +133,7 @@ fn rata_generate_sample_graph() -> ratatoskr_core::GraphData {
 
 #[tauri::command]
 fn get_pending_file(state: tauri::State<PendingFile>) -> Option<String> {
-    state.0.lock().unwrap().take()
+    state.0.lock().ok()?.take()
 }
 
 // ============================================================================
@@ -156,6 +166,8 @@ pub fn run() {
             kvas_read_jsonl_info,
             kvas_read_jsonl_entry,
             kvas_export_entry_as,
+            kvas_read_table,
+            kvas_export_table_csv,
             // Ratatoskr
             rata_load_graph,
             rata_save_graph,
@@ -163,16 +175,17 @@ pub fn run() {
             rata_generate_sample_graph,
         ])
         .build(tauri::generate_context!())
-        .expect("Yggdrasil failed to build")
+        .unwrap_or_else(|_| std::process::exit(1))
         .run(|app_handle, event| {
             #[cfg(target_os = "macos")]
             if let tauri::RunEvent::Opened { urls } = &event {
                 for url in urls {
                     if let Ok(path) = url.to_file_path() {
                         let path_str = path.to_string_lossy().to_string();
-                        *app_handle.state::<PendingFile>().0.lock().unwrap() =
-                            Some(path_str.clone());
                         let _ = app_handle.emit("open-file", &path_str);
+                        if let Ok(mut pending) = app_handle.state::<PendingFile>().0.lock() {
+                            *pending = Some(path_str);
+                        }
                     }
                 }
             }
