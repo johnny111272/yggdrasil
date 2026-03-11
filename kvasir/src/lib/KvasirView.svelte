@@ -283,6 +283,7 @@
       "json": "json",
       "yaml": "yaml",
       "toml": "ini",
+      "ron": "rust",
       "markdown": "markdown",
       "sql": "sql",
       "bash": "bash",
@@ -634,6 +635,7 @@
 
   .wrap-toggle {
     margin-left: auto;
+    flex-shrink: 0;
     font-family: var(--font-mono);
     font-size: var(--text-xs);
   }

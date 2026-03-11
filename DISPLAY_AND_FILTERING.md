@@ -2,79 +2,158 @@
 
 ## Purpose
 
-Design specification for how Hlidskjalf displays exchange-pair diffs from Bifrost and provides intelligent filtering across concurrent sessions. This covers the feed rendering, the filter bar, session management, and the interaction model.
+Design specification for how Hlidskjalf renders its datagram feed — the scrolling stream of events from all active sessions. Covers the normative datagram contract, the rendering system, specialized renderers for complex payloads, the filter bar, and session management.
 
 ## Context
 
-Bifrost intercepts Claude Code API traffic and diffs consecutive main conversation exchanges. Each diff produces a datagram sent to Hlidskjalf via the Unix socket. The diff has three dimensions: messages, system blocks, and tools. Hlidskjalf must display these diffs alongside existing event types (alerts, reports, canaries, notifications) while letting the user manage noise from multiple concurrent sessions.
+Hlidskjalf receives datagrams via UDP multicast on 239.0.0.1:9899. Sources include guardrail hooks (gleipnir, syn), the traffic intercept pipeline (bifrost), lockfile monitors, and general alerts/notifications. The feed is always visible while working — a scrolling stream read by pattern, not by individual entry. The rendering system must show signal without intervention: steady rhythm = work happening, visual break = attention needed.
 
 ---
 
-## Exchange Diff Datagrams
+## Normative Datagram Contract
 
-### Priority Determination
+### Design Principle: Pattern B
 
-The datagram priority is set by the **highest-priority dimension that changed**:
+The envelope is self-describing. `kind` tells you exactly what you're holding — you never read the payload to determine the datagram's identity. `kind` drives both rendering (which component draws it) and filtering (which chips toggle it).
 
-| What changed | Priority | Rationale |
-|-------------|----------|-----------|
-| Messages only (no system or tool changes) | low | Context anchor, no actionable signal |
-| Tool definitions added/removed/modified | normal | Operational awareness — available capabilities changed |
-| System prompt content added/modified | high | The instructions governing the session changed |
-| Compaction detected | critical | Everything dropped, new summary replaces all context |
+### Envelope Fields
 
-A single datagram may have changes in multiple dimensions. The priority reflects the most significant one.
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `timestamp` | f64 | yes | Unix timestamp |
+| `kind` | string enum | yes | Specific datagram identity (see Kind Enum below) |
+| `source` | string | yes | Who sent it (e.g. "gleipnir", "intercept", "lockfile_monitor") |
+| `priority` | string enum | yes | Severity: `"trace"`, `"low"`, `"normal"`, `"high"`, `"critical"` |
+| `workspace` | string | yes | Project/workspace name |
+| `detail` | string | no | Human-readable one-line summary |
+| `speech` | string | no | Voice alert text (triggers TTS when priority exceeds speech threshold) |
+| `payload` | object | no | Structured data — shape determined by `kind` |
 
-### Datagram Fields
+**Note:** Field renamed from `type` to `kind`. Aligns with Rust (`DatagramKind`), avoids reserved word conflicts in TypeScript/Python, and matches TypeScript discriminated union convention.
+
+### Kind Enum
+
+Each kind is a specific, self-describing identity. No categories — every kind gets its own filter chip.
+
+| Kind | Source(s) | Payload? | Payload Schema | Description |
+|------|-----------|----------|----------------|-------------|
+| `alert` | lockfile monitor, send_alert | no | — | Operational alerts, kill switch, keep-alive failures |
+| `canary` | heartbeat senders | no | — | Presence signal — session is alive |
+| `notify` | general notifications | no | — | Informational messages |
+| `syn` | gleipnir (pre-commit hook), syn CLI | yes | syn report groups | Code quality report — single-file (hook) or multi-file (scan) |
+| `exchange` | traffic intercept | yes | `traffic.schema.json` | API round-trip: user/assistant/tools/system |
+
+Gleipnir and syn CLI are both syn — same payload shape, same renderer. `source` distinguishes the trigger context ("gleipnir" vs "syn") but `kind` is `"syn"` either way.
+
+The enum is extensible. New producers add new kinds — each gets its own rendering and filtering without modifying existing kinds.
+
+### Migration from `type` to `kind`
+
+| Where | Change |
+|-------|--------|
+| `socket_emit` struct | Remove `#[serde(rename = "type")]` from `kind` field |
+| `datagram.schema.json` | Rename field `type` → `kind`, update enum values |
+| Bifrost/intercept producers | Emit `"kind"` instead of `"type"` |
+| `hlidskjalf_core` | `HookEvent → Datagram` conversion already produces `kind` — no change |
+| `HlidskjalfView.svelte` | `ev.type` → `ev.kind` throughout |
+| nornir CLI tools | `send_alert`, `send_datagram` etc. emit `"kind"` |
+
+---
+
+## Exchange Datagrams — Traffic Shape
+
+**Schema:** `nornir/schemas/payloads/traffic.schema.json`
+
+### Envelope
 
 | Field | Value |
 |-------|-------|
-| `type` | `"exchange"` |
-| `source` | `"bifrost"` |
-| `priority` | Determined by highest-priority dimension (see above) |
-| `workspace` | Workspace name from Bifrost session resolution |
-| `detail` | Human-readable summary, e.g. "system prompt updated, 2 tools added" |
-| `speech` | Generated for high+ priority, absent for low/normal |
-| `payload` | Structured diff data (see below) |
+| `kind` | `"exchange"` |
+| `source` | `"intercept"` |
+| `priority` | `"low"` for most exchanges, `"normal"` when system injections detected |
+| `workspace` | Workspace name from session resolution (e.g. "odinn", "yggdrasil") |
+| `payload` | Flat object with content fields (see below) |
+
+Note: `detail` and `speech` are not currently set on exchange datagrams — the payload carries all the information.
 
 ### Payload Structure
 
-```json
-{
-  "type": "exchange_diff",
-  "session_id": "uuid",
-  "exchange_index": 42,
-  "is_compaction": false,
-  "dimensions": {
-    "messages": {
-      "changed": true,
-      "turns_added": 3,
-      "summary": "user asked about X, assistant responded with Y"
-    },
-    "system": {
-      "changed": true,
-      "blocks_added": ["full text of new system block..."],
-      "blocks_removed": [],
-      "blocks_modified": [
-        {
-          "before_snippet": "first 200 chars...",
-          "after_snippet": "first 200 chars...",
-          "full_before": "...",
-          "full_after": "..."
-        }
-      ]
-    },
-    "tools": {
-      "changed": true,
-      "added": ["tool_name_1"],
-      "removed": [],
-      "modified": ["tool_name_2"]
-    }
-  }
-}
-```
+The payload is **flat** — no nested `dimensions` object. Each field is present only when it has content (sparse). The schema is `traffic.schema.json` with `additionalProperties: false`.
 
-Payload details will evolve as we see real diffs. This is a starting shape.
+**Always present:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `exchange_kind` | enum | `"startup"`, `"conversation"`, or `"tool"` (also `"subagent"`, `"planning"` per schema) |
+| `source` | string | Reference to raw exchange: `"mainexch_{uuid}.jsonl:{line}"` |
+| `system_injection` | boolean | True when platform-injected system-reminders are present |
+
+**Content fields (present when non-empty):**
+
+| Field | Type | Frequency | Description |
+|-------|------|-----------|-------------|
+| `user` | string | 34% | User-authored text content |
+| `assistant` | string | 62% | Assistant response text |
+| `thinking` | string | 25% | Chain-of-thought reasoning |
+| `system` | string | 7% | System-reminder blocks (can be very large: up to 60KB) |
+| `instructions` | string | <1% | New system prompt blocks (CLAUDE.md additions) |
+| `tool_return` | string | 79% | Tool result content (can be very large: up to 127KB) |
+
+**Tool invocation fields (present when tools used, single object or array):**
+
+| Field | Type | Frequency | Object shape |
+|-------|------|-----------|--------------|
+| `shell` | tool_input[] | 48% | `{ command, description }` |
+| `file_edit` | tool_input[] | 24% | `{ file_path, old_string, new_string, replace_all }` |
+| `file_read` | tool_input[] | 6% | `{ file_path }` |
+| `file_write` | tool_input[] | 1% | `{ file_path, content }` |
+| `file_search` | tool_input[] | <1% | `{ pattern, path? }` |
+| `text_search` | tool_input[] | 2% | `{ pattern, path?, output_mode? }` |
+| `web_search` | tool_input[] | 0% | `{ query }` |
+| `web_fetch` | tool_input[] | 0% | `{ url, prompt }` |
+| `agent_dispatch` | tool_input[] | 0% | Task tool inputs |
+| `ask_question` | tool_input[] | 0% | AskUserQuestion inputs |
+| `start_plan` | tool_input[] | 0% | EnterPlanMode inputs |
+| `finish_plan` | tool_input[] | 0% | ExitPlanMode inputs |
+| `tool_use` | tool_input[] | 1% | Generic/unmapped tools (e.g. `{ taskId, status }`) |
+| `tools_added` | string[] | 0% | Names of newly available tool definitions |
+
+### Exchange Kind Distribution (real data, 234 datagrams from one session)
+
+| Kind | Count | % | Typical content |
+|------|-------|---|-----------------|
+| `tool` | 153 | 65% | Tool invocations + results, usually no user text |
+| `conversation` | 80 | 34% | User message + assistant response |
+| `startup` | 1 | <1% | Session start — large system prompt, many tools |
+
+### Field Size Reality
+
+The payload can be heavy. Key fields by size:
+
+| Field | Median | Max | Notes |
+|-------|--------|-----|-------|
+| `tool_return` | 190 chars | 127KB | Dominates payload size |
+| `system` | 1.6KB | 61KB | System-reminders from platform injections |
+| `file_edit` | 1.8KB | 86KB | Full old_string/new_string diffs |
+| `user` | 113 chars | 22KB | Usually short, large when pasting context |
+| `assistant` | 137 chars | 18KB | Varies widely |
+| `thinking` | 704 chars | 29KB | When present, substantial |
+
+### Priority Determination (current)
+
+| Condition | Priority | Rationale |
+|-----------|----------|-----------|
+| `system_injection: true` | `normal` | Platform injected system-reminders — instructions changed |
+| Everything else | `low` | Standard exchange activity |
+
+**Future priority escalation** (not yet implemented in Bifrost):
+
+| Condition | Priority | Rationale |
+|-----------|----------|-----------|
+| `instructions` field present | `high` | New CLAUDE.md or workspace instructions loaded |
+| `tools_added` field present | `normal` | Tool definitions changed |
+| `exchange_kind: "startup"` | `normal` | Session start/resume/post-compaction |
+| Compaction detected | `critical` | Context compressed — all prior context replaced |
 
 ---
 
@@ -114,10 +193,10 @@ Two horizontal zones stacked vertically below the header.
 **Zone 1: Event Controls**
 
 ```
-[all] [alert] [report] [exchange] [canary] [notify]  |  min: [normal ▾]  ···  [🔔 monitoring ▾]  [auto-scroll ✓]  [clear]
+[all] [alert] [syn] [exchange] [canary] [notify]  |  min: [normal ▾]  ···  [🔔 monitoring ▾]  [auto-scroll ✓]  [clear]
 ```
 
-- **Type filter chips** — click to show only that type. "all" shows everything. Chips appear dynamically as event types are seen (same as current behavior, with "exchange" added).
+- **Kind filter chips** — click to show only that kind. "all" shows everything. Chips appear dynamically as kinds are seen.
 - **Priority minimum** — dropdown or cycle control. Sets the minimum severity for events to appear in the feed. Default: "normal" (hides low-priority message-only exchanges and canaries without special logic).
 - **Alert profile selector** — bell icon with current profile name. Click for popover with profile switching and customization (see NEURODIVERGENT_MODALITIES.md).
 - **Auto-scroll** — checkbox. When on, feed scrolls to bottom on new events.
@@ -139,15 +218,15 @@ Two horizontal zones stacked vertically below the header.
 
 The three filter dimensions AND together:
 
-1. **Type** — which event categories to show
+1. **Kind** — which datagram kinds to show (per-kind granularity)
 2. **Priority minimum** — what severity threshold to display
 3. **Session visibility** — which workspace sessions to include
 
 Example combinations:
-- "Show me everything from bragi" → type=all, min=trace, only bragi active
-- "Show me only system prompt changes across all sessions" → type=exchange, min=high, all sessions active
-- "Show me alerts and reports, ignore noise" → alert+report types, min=normal, all sessions active
-- "What's happening in phoenix right now" → only phoenix active, type=all, min=normal
+- "Show me everything from bragi" → kind=all, min=trace, only bragi active
+- "Show me only exchange traffic across all sessions" → kind=exchange, min=low, all sessions active
+- "Show me gleipnir and alerts, ignore noise" → alert+gleipnir kinds, min=normal, all sessions active
+- "What's happening in phoenix right now" → only phoenix active, kind=all, min=normal
 
 ---
 
@@ -206,17 +285,23 @@ This lets you visually scan the feed and follow one session's narrative by color
 
 ---
 
-## New Datagram Type
+## Kind Enum Migration
 
-The `type` enum in the datagram schema needs a new value: `"exchange"`.
+The `DatagramKind` enum in `socket_emit` needs updating to match the normative contract:
 
-Updated enum: `["alert", "report", "canary", "notify", "exchange"]`
+**Current:** `Alert, Report, Canary, Notify, Exchange`
+**Target:** `Alert, Canary, Notify, Syn, Exchange`
 
-This requires updating:
-- `schemas/datagram.schema.json` — add "exchange" to the type enum
-- nornir `socket_emit` — add `Exchange` variant to `DatagramKind` enum (already present)
-- `HlidskjalfView.svelte` — add "exchange" to `typeIcon` mapping, add renderer for exchange_diff payloads
-- New component: `ExchangeDiffReport.svelte` — renderer for exchange_diff payloads (parallel to GleipnirReport.svelte)
+`Report` becomes `Syn` — both gleipnir hooks and syn CLI produce syn reports. The wire format uses lowercase: `"syn"`, `"exchange"`, etc.
+
+Changes required:
+- `socket_emit` — rename `Report` → `Syn`, remove `#[serde(rename = "type")]` from `kind` field
+- `datagram.schema.json` — rename field `type` → `kind`, update enum to `["alert", "canary", "notify", "syn", "exchange"]`
+- Gleipnir hook producers — emit `"kind": "syn"` instead of `"type": "report"`
+- Syn CLI — emit `"kind": "syn"` instead of `"type": "report"`
+- Bifrost/intercept — emit `"kind": "exchange"` instead of `"type": "exchange"`
+- `HlidskjalfView.svelte` — `ev.type` → `ev.kind`, update `typeIcon()`, update filter chips, update payload routing
+- `hlidskjalf_core` — update `HookEvent → Datagram` to produce `Syn` kind (currently produces `Report`)
 
 ---
 

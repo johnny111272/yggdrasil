@@ -35,6 +35,7 @@ pub struct AllFormats {
     pub yaml: FormatConversion,
     pub toml: FormatConversion,
     pub toon: FormatConversion,
+    pub ron: FormatConversion,
     pub source_format: String,
 }
 
@@ -152,6 +153,7 @@ pub fn convert_to_all_formats(content: &str, source_format: &str) -> Result<AllF
         "yaml" => parse::yaml(content).map_err(|e| e.to_string())?,
         "toml" => parse::toml(content).map_err(|e| e.to_string())?,
         "toon" => parse::toon(content).map_err(|e| e.to_string())?,
+        "ron" => ron::from_str(content).map_err(|e| e.to_string())?,
         _ => return Err(format!("Unsupported format: {}", source_format)),
     };
 
@@ -165,6 +167,9 @@ pub fn convert_to_all_formats(content: &str, source_format: &str) -> Result<AllF
 
     let toon_content = serialize::to_toon(&value)
         .unwrap_or_else(|e| format!("# TOON: {}", e));
+
+    let ron_content = ron::ser::to_string_pretty(&value, ron::ser::PrettyConfig::default())
+        .unwrap_or_else(|e| format!("// RON: {}", e));
 
     Ok(AllFormats {
         json: FormatConversion {
@@ -183,6 +188,10 @@ pub fn convert_to_all_formats(content: &str, source_format: &str) -> Result<AllF
             token_count: estimate_token_count(&toon_content),
             content: toon_content,
         },
+        ron: FormatConversion {
+            token_count: estimate_token_count(&ron_content),
+            content: ron_content,
+        },
         source_format: source_format.to_string(),
     })
 }
@@ -196,6 +205,7 @@ pub fn detect_data_format(path: &str) -> Option<String> {
         "yaml" | "yml" => Some("yaml".to_string()),
         "toml" => Some("toml".to_string()),
         "toon" => Some("toon".to_string()),
+        "ron" => Some("ron".to_string()),
         _ => None,
     }
 }
@@ -269,6 +279,7 @@ pub fn export_entry_as(
             "yaml" => all.yaml.content,
             "toml" => all.toml.content,
             "toon" => all.toon.content,
+            "ron" => all.ron.content,
             _ => return Err(format!("Unknown format: {}", format)),
         }
     };
@@ -320,6 +331,7 @@ fn detect_language(extension: &str) -> String {
         "json" | "jsonld" | "qa" | "meta" | "index" | "jsonl" => "json",
         "yaml" | "yml" => "yaml",
         "toml" => "toml",
+        "ron" => "ron",
         "md" | "markdown" => "markdown",
         "sql" => "sql",
         "sh" | "bash" | "zsh" => "bash",
