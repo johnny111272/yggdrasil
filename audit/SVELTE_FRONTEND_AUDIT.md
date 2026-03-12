@@ -73,7 +73,7 @@ The `visibility: hidden` approach preserves DOM state when switching tabs (good)
 
 ### S-1. Hlidskjalf uses zero shared UI components
 
-HlidskjalfView.svelte imports only `GleipnirReport.svelte` (its own sibling) and Tauri APIs. It hand-rolls:
+HlidskjalfView.svelte imports only `QualityReport.svelte` (its own sibling) and Tauri APIs. It hand-rolls:
 - Stat cards (`.stat`, `.stat-value`, `.stat-label` at lines 338-359) -- the shared `StatCard` component does this
 - Filter buttons (`.filter-btn` at lines 373-393) -- these could use shared `Button` with a variant
 - The entire layout structure, ignoring `SidebarLayout`
@@ -175,11 +175,11 @@ This self-assignment exists to "trigger reactivity" after mutating nested proper
 ### Hlidskjalf
 
 **Component:** `HlidskjalfView.svelte` (563 lines)
-**Sibling:** `GleipnirReport.svelte` (294 lines)
+**Sibling:** `QualityReport.svelte` (294 lines)
 
 **Strengths:**
 - Correct `commands` prop contract with defaults for standalone use.
-- Correct `./` import for `GleipnirReport`.
+- Correct `./` import for `QualityReport`.
 - Good use of `$derived` for filtered events and stats.
 - Canary events get compact rendering -- good information density decision.
 - Speech threshold cycling is a creative UX pattern for accessibility profiles.
@@ -200,7 +200,7 @@ This self-assignment exists to "trigger reactivity" after mutating nested proper
 
 7. **Two hardcoded `rgba()` colors** in styles (lines 477, 481): `rgba(255, 51, 51, 0.08)` and `rgba(255, 153, 0, 0.05)`. These are transparent tints of the severity colors but do not reference the design tokens. They will not update if the color palette changes.
 
-**GleipnirReport.svelte:**
+**QualityReport.svelte:**
 - Well-structured. Good use of typed props.
 - All colors reference design tokens.
 - Location rendering handles both `line` and `lines` (single vs multi-line violations).
@@ -377,7 +377,7 @@ App-specific dependencies:
 
 The design token system in `tokens.css` is solid and covers colors, spacing, typography, radius, and shadows. `base.css` provides a clean reset. The problem is adoption:
 
-- Hlidskjalf and GleipnirReport use tokens consistently (except 2 rgba values).
+- Hlidskjalf and QualityReport use tokens consistently (except 2 rgba values).
 - Svalinn uses tokens consistently.
 - Kvasir uses tokens in KvasirView but SchemaInspector has 22 hardcoded colors.
 - Ratatoskr has 7 hardcoded colors in script and D3 calls.

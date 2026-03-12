@@ -56,7 +56,7 @@ Each standalone app registers commands with bare names. Yggdrasil prefixes them:
 
 ### INV-5: Datagram protocol uses typed enums, not strings
 
-`DatagramKind` and `Priority` are Rust enums in nornir's `socket_emit` crate, re-exported by `hlidskjalf_core`. Wire format uses lowercase strings via `#[serde(rename_all = "lowercase")]`.
+`DatagramKind` and `Priority` are Rust enums in nornir's `datagram` crate, re-exported by `hlidskjalf_core`. Wire format uses lowercase strings via `#[serde(rename_all = "lowercase")]`.
 
 **What to look for:**
 - String comparisons for datagram type or priority instead of enum matching

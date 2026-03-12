@@ -16,7 +16,7 @@ Not a list. Not a table. One record at a time, keyboard-navigated.
 │  {                                                    │
 │    "timestamp": 1741523400.0,                         │
 │    "source": "bifrost",                               │
-│    "type": "exchange",                                │
+│    "kind": "traffic",                                 │
 │    "priority": "normal",                              │
 │    ...                                                │
 │  }                                                    │

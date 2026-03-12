@@ -27,7 +27,7 @@ Yggdrasil is a unified introspection platform — 5 Tauri 2.x desktop apps for m
 | Document | Path | Relevance | Freshness |
 |----------|------|-----------|-----------|
 | PLAN_UNIFIED_SHELL | `PLAN_UNIFIED_SHELL.md` | Authoritative architecture for the unified shell, command prefixing, Vite aliases, deployment | Current |
-| DATAGRAM_SPECIFICATION | `DATAGRAM_SPECIFICATION.md` | Datagram format definition, field semantics, priority levels, sender binaries | Current — note: Datagram struct now lives in nornir's socket_emit with typed enums |
+| DATAGRAM_SPECIFICATION | `DATAGRAM_SPECIFICATION.md` | Datagram format definition, field semantics, priority levels, sender binaries | Current — note: Datagram struct now lives in nornir's datagram with typed enums |
 | HLIDSKJALF_DATAGRAM | `HLIDSKJALF_DATAGRAM.md` | Socket protocol, event emission, Hlidskjalf-specific datagram handling, lockfile system | Current |
 | DISPLAY_AND_FILTERING | `DISPLAY_AND_FILTERING.md` | Exchange diff display, session chips, filter bar design | Current — design doc, not yet implemented |
 | NEURODIVERGENT_MODALITIES | `NEURODIVERGENT_MODALITIES.md` | Alert modalities, profiles, ambient awareness system | Current — design doc, not yet implemented |
@@ -49,9 +49,11 @@ Yggdrasil is a unified introspection platform — 5 Tauri 2.x desktop apps for m
 
 | Schema | Path | What It Defines |
 |--------|------|----------------|
-| Datagram | `schemas/datagram.schema.json` | Wire format for the datagram protocol — fields, types, enums for priority and type |
+| Datagram | `schemas/datagram.schema.json` | Wire format for the datagram protocol — envelope fields, kind and priority enums |
+| Quality Payload | `schemas/payloads/payload.quality.schema.json` | Payload for `kind: "quality"` — syn report groups |
+| Traffic Payload | `schemas/payloads/payload.traffic.schema.json` | Payload for `kind: "traffic"` — bifrost exchange diffs |
 
-**Note:** The Rust `Datagram` struct lives in nornir's `socket_emit` crate with typed `DatagramKind` and `Priority` enums. The JSON schema defines the wire format; the Rust enums provide compile-time safety. The `type` enum in the schema needs `"exchange"` added before the Bifrost integration work begins.
+**Note:** The Rust `Datagram` struct lives in nornir's `datagram` crate with typed `DatagramKind` (Alert, Quality, Canary, Notify, Traffic) and `Priority` enums. Wire field is `kind` (not `type`).
 
 ---
 
@@ -61,7 +63,7 @@ Yggdrasil is a unified introspection platform — 5 Tauri 2.x desktop apps for m
 
 | File | Purpose |
 |------|---------|
-| `Cargo.toml` | Workspace manifest — 10 crates (5 core + 5 Tauri), shared dependency versions, cross-repo socket_emit dep |
+| `Cargo.toml` | Workspace manifest — 10 crates (5 core + 5 Tauri), shared dependency versions, cross-repo datagram dep |
 | `deploy_apps.sh` | Build all 5 apps, move .app bundles to /Applications, clean build artifacts |
 | `.cargo/config.toml` | Build target configuration (aarch64-apple-darwin) |
 
@@ -70,7 +72,7 @@ Yggdrasil is a unified introspection platform — 5 Tauri 2.x desktop apps for m
 | Crate | Path | Purpose | Key Types/Functions |
 |-------|------|---------|---------------------|
 | `common_core` | `core/common_core/` | Shared utilities used by 2+ core crates | `open_in_editor()` |
-| `hlidskjalf_core` | `core/hlidskjalf_core/` | Socket listener, datagram parsing, lockfile monitor, log rotation, voice | `Datagram`, `DatagramKind`, `Priority` (re-exported from socket_emit), `HookEvent`, `start_all()`, `speak()` |
+| `hlidskjalf_core` | `core/hlidskjalf_core/` | Socket listener, datagram parsing, lockfile monitor, log rotation, voice | `Datagram`, `DatagramKind`, `Priority` (re-exported from datagram), `HookEvent`, `start_all()`, `speak()` |
 | `svalinn_core` | `core/svalinn_core/` | QA sidecar scanning, saga runner | `scan_directory()`, `list_qa_tree()`, `QaSidecarReport`, `ScanResult` |
 | `kvasir_core` | `core/kvasir_core/` | File browsing, format conversion (JSON/YAML/TOML/TOON) | `list_directory()`, `read_file()`, `convert_to_all_formats()`, `detect_data_format()` |
 | `ratatoskr_core` | `core/ratatoskr_core/` | Graph loading, JSON-LD parsing, merge config | `load_graph()`, `parse_jsonld()` |
@@ -79,7 +81,7 @@ Yggdrasil is a unified introspection platform — 5 Tauri 2.x desktop apps for m
 
 | Crate | Source | What It Provides |
 |-------|--------|-----------------|
-| `socket_emit` | `../nornir/capability/socket_emit` | `Datagram`, `DatagramKind`, `Priority` enums, `now()`, fire-and-forget Unix socket send |
+| `datagram` | `../nornir/capability/datagram` | `Datagram`, `DatagramKind`, `Priority` enums, `now()`, fire-and-forget Unix socket send |
 
 ### Tauri Shells — Thin Command Wrappers
 
@@ -95,7 +97,7 @@ Yggdrasil is a unified introspection platform — 5 Tauri 2.x desktop apps for m
 
 | App | View Component | Path | Supporting Components |
 |-----|---------------|------|-----------------------|
-| Hlidskjalf | `HlidskjalfView.svelte` | `hlidskjalf/src/lib/` | `GleipnirReport.svelte` |
+| Hlidskjalf | `HlidskjalfView.svelte` | `hlidskjalf/src/lib/` | `QualityReport.svelte` |
 | Svalinn | `SvalinnView.svelte` | `svalinn/src/lib/` | — |
 | Kvasir | `KvasirView.svelte` | `kvasir/src/lib/` | `MarkdownPreview.svelte`, `SchemaInspector.svelte`, `schema-inspect.ts` |
 | Ratatoskr | `RatatoskrView.svelte` | `ratatoskr/src/lib/` | — |
@@ -126,7 +128,7 @@ Severity token: `--severity-success` (green), `--severity-warning` (amber), `--s
 
 | Dependency | Source | What It Provides |
 |------------|--------|-----------------|
-| Nornir `socket_emit` | `~/.ai/smidja/nornir/capability/socket_emit` | `Datagram`, `DatagramKind`, `Priority` — canonical protocol types, fire-and-forget socket send |
+| Nornir `datagram` | `~/.ai/smidja/nornir/capability/datagram` | `Datagram`, `DatagramKind`, `Priority` — canonical protocol types, fire-and-forget socket send |
 | Nornir binaries | `~/.ai/smidja/nornir/` | `send_alert`, `send_datagram`, etc. — CLI tools for emitting datagrams to the Hlidskjalf Unix socket |
 | Bifrost | `~/.ai/smidja/bifrost/` | Exchange diff datagrams (planned), compaction alerts (current via `send_alert`) |
 | Datagram protocol | `schemas/datagram.schema.json` | Wire format contract between all datagram producers and the Hlidskjalf consumer |
@@ -150,7 +152,7 @@ Severity token: `--severity-success` (green), `--severity-warning` (amber), `--s
 | **How command prefixing works** | `PLAN_UNIFIED_SHELL.md` "Command Naming Convention" |
 | **How Vite aliases import cross-app views** | `PLAN_UNIFIED_SHELL.md` "Frontend Architecture" + `yggdrasil/vite.config.js` |
 | **The view component contract (commands prop)** | `PLAN_UNIFIED_SHELL.md` + `hlidskjalf/src/lib/HlidskjalfView.svelte` as reference implementation |
-| **The datagram format and typed enums** | `schemas/datagram.schema.json` + `DATAGRAM_SPECIFICATION.md` + nornir `socket_emit/src/lib.rs` |
+| **The datagram format and typed enums** | `schemas/datagram.schema.json` + `DATAGRAM_SPECIFICATION.md` + nornir `datagram/src/lib.rs` |
 | **How Hlidskjalf listens for events** | `core/hlidskjalf_core/src/lib.rs` `start_all()` |
 | **The exchange diff display design** | `DISPLAY_AND_FILTERING.md` |
 | **The multi-modal alert system** | `NEURODIVERGENT_MODALITIES.md` |
@@ -158,7 +160,7 @@ Severity token: `--severity-success` (green), `--severity-warning` (amber), `--s
 | **What shared UI components exist** | `ui/components/*.svelte` |
 | **What anti-patterns to avoid** | `CLAUDE.md` "You Will Get These Things Wrong" |
 | **How to audit this codebase** | `AUDIT_GUIDE.md` — invariants, drift patterns, runnable checklist |
-| **How GleipnirReport renders payloads** | `hlidskjalf/src/lib/GleipnirReport.svelte` — reference for building new payload renderers |
+| **How QualityReport renders payloads** | `hlidskjalf/src/lib/QualityReport.svelte` — reference for building new payload renderers |
 
 ---
 
@@ -166,7 +168,7 @@ Severity token: `--severity-success` (green), `--severity-warning` (amber), `--s
 
 ### Current Build State
 
-All 5 apps have working Rust backends and Svelte frontends. Hlidskjalf is the most complete — working event feed with datagram rendering, GleipnirReport payload renderer, priority/type filtering, speech alerts, auto-scroll, lockfile monitoring, log rotation.
+All 5 apps have working Rust backends and Svelte frontends. Hlidskjalf is the most complete — working event feed with datagram rendering, QualityReport payload renderer, priority/kind filtering, speech alerts, auto-scroll, lockfile monitoring, log rotation.
 
 ### Active Design — Not Yet Implemented
 
@@ -174,11 +176,7 @@ All 5 apps have working Rust backends and Svelte frontends. Hlidskjalf is the mo
 - **Session-aware filtering**: Workspace chips, color families, per-session toggles. Design in `DISPLAY_AND_FILTERING.md`.
 - **Multi-modal alerts**: LED, click, pulse bar, flash, speech. Profiles (hyperfocus, sensitive, monitoring, active, silent). Design in `NEURODIVERGENT_MODALITIES.md`.
 - **Geiger counter**: Ambient activity-rate audio + visual chip pulsing. Design in `NEURODIVERGENT_MODALITIES.md`.
-- **ExchangeDiffReport.svelte**: New payload renderer for exchange diffs (parallel to GleipnirReport.svelte). Described in `DISPLAY_AND_FILTERING.md`.
-
-### Schema Update Needed
-
-`schemas/datagram.schema.json` type enum needs `"exchange"` added before exchange diff datagrams can flow.
+- **TrafficReport renderer**: New payload renderer for traffic datagrams (parallel to QualityReport.svelte). Described in `DISPLAY_AND_FILTERING.md`.
 
 ### Gitignore Gotcha
 

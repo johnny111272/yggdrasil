@@ -67,8 +67,8 @@ yggdrasil/                        # Workspace root (~/.ai/smidja/yggdrasil/)
       Cargo.toml                  # no deps (just std)
       src/lib.rs                  # open_in_editor()
     hlidskjalf_core/              # Socket listener, datagram parsing, lockfiles, voice
-      Cargo.toml                  # deps: socket_emit, tokio, serde, serde_json, dirs
-      src/lib.rs                  # re-exports Datagram/DatagramKind/Priority from socket_emit
+      Cargo.toml                  # deps: datagram, tokio, serde, serde_json, dirs
+      src/lib.rs                  # re-exports Datagram/DatagramKind/Priority from datagram
     svalinn_core/                 # QA sidecar scanning, saga runner
       Cargo.toml                  # deps: common_core, serde, serde_json, glob, dirs
       src/lib.rs
@@ -86,7 +86,7 @@ yggdrasil/                        # Workspace root (~/.ai/smidja/yggdrasil/)
     src/
       lib/
         HlidskjalfView.svelte     # Event feed UI (git add -f required)
-        GleipnirReport.svelte     # Gleipnir/syn report renderer
+        QualityReport.svelte     # Quality datagram payload renderer
       routes/
         +page.svelte              # Thin wrapper: <HlidskjalfView />
     src-tauri/
@@ -175,14 +175,14 @@ async fn start_monitor(app: tauri::AppHandle) -> Result<(), String> {
 
 ### Datagram Protocol
 
-The `Datagram` struct is defined in nornir's `socket_emit` crate and imported via cross-repo path dependency. `hlidskjalf_core` re-exports it:
+The `Datagram` struct is defined in nornir's `datagram` crate and imported via cross-repo path dependency. `hlidskjalf_core` re-exports it:
 
 ```rust
-pub use socket_emit::{Datagram, DatagramKind, Priority};
+pub use datagram::{Datagram, DatagramKind, Priority};
 ```
 
 `DatagramKind` and `Priority` are enums (not strings):
-- `DatagramKind`: Alert, Report, Canary, Notify, Exchange
+- `DatagramKind`: Alert, Quality, Canary, Notify, Traffic
 - `Priority`: Trace, Low, Normal, High, Critical (with PartialOrd, Ord)
 
 Wire format uses `#[serde(rename_all = "lowercase")]` so JSON remains `"alert"`, `"critical"`, etc.
@@ -254,7 +254,7 @@ members = [
 ]
 
 [workspace.dependencies]
-socket_emit = { path = "../nornir/capability/socket_emit" }
+datagram = { path = "../nornir/capability/datagram" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 serde_yaml = "0.9"
@@ -327,12 +327,11 @@ Syn groups issues and sends them via Unix socket as datagrams:
 {
   "timestamp": 1646064000.0,
   "source": "syn",
-  "type": "report",
+  "kind": "quality",
   "priority": "normal",
   "workspace": "bragi",
   "detail": "7 issues, 0 deny",
   "payload": {
-    "type": "gleipnir_report|syn_report",
     "total": 7,
     "check_types": 3,
     "groups": [
@@ -353,7 +352,7 @@ Syn groups issues and sends them via Unix socket as datagrams:
 }
 ```
 
-GleipnirReport.svelte renders the `groups` array with expandable
+QualityReport.svelte renders the `groups` array with expandable
 details. HlidskjalfView discriminates on `payload.type`.
 
 ### Voice Level
@@ -371,7 +370,7 @@ Each app's view lives in its own `src/lib/` directory:
 
 | App | View File | Internal Imports |
 |-----|-----------|------------------|
-| Hlidskjalf | `src/lib/HlidskjalfView.svelte` | `./GleipnirReport.svelte` (relative, not $lib) |
+| Hlidskjalf | `src/lib/HlidskjalfView.svelte` | `./QualityReport.svelte` (relative, not $lib) |
 | Svalinn | `src/lib/SvalinnView.svelte` | none |
 | Kvasir | `src/lib/KvasirView.svelte` | `./SchemaInspector.svelte`, `./schema-inspect.ts` (relative) |
 | Ratatoskr | `src/lib/RatatoskrView.svelte` | none |

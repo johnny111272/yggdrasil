@@ -194,7 +194,7 @@ The variable progression `event.payload` -> `ev` creates a naming chain where `e
 
 **Good:**
 - `HlidskjalfView`, `SvalinnView`, `KvasirView`, `RatatoskrView` -- `*View` suffix clearly communicates "top-level view component for this app."
-- `GleipnirReport` -- accurately describes what it renders.
+- `QualityReport` -- accurately describes what it renders (renamed from `GleipnirReport`).
 - `SchemaInspector` -- clear purpose.
 - `commands` prop -- the key architectural prop is well-named. It communicates "a map of command names" without implying what the values are.
 - `SidebarLayout`, `Button`, `Badge`, `Input`, `Select`, `Panel`, `StatCard`, `TreeNode`, `Collapsible`, `ListItem`, `SearchInput`, `FilterBanner` -- all clear, standard UI vocabulary.
@@ -224,7 +224,7 @@ The variable progression `event.payload` -> `ev` creates a naming chain where `e
 **Good:**
 - Token naming follows a clear hierarchy: `--bg-primary/secondary/tertiary`, `--text-primary/secondary/muted`, `--severity-blocked/error/warning/info`, `--action-primary/neutral/special`.
 - Spacing scale: `--space-xs/sm/md/lg/xl/2xl/3xl` -- standard.
-- Class names are descriptive: `.watchtower`, `.gleipnir-report`, `.event-row`, `.event-meta`, `.event-priority`.
+- Class names are descriptive: `.watchtower`, `.quality-report`, `.event-row`, `.event-meta`, `.event-priority`.
 
 **Problems:**
 - `--severity-info` is green (`#6bcb77`). An LLM would infer "info" means blue (the universal convention). Green is the success/good color. This will cause confusion if anyone adds a blue "informational" severity. **Suggested rename:** `--severity-success` or `--severity-good`.

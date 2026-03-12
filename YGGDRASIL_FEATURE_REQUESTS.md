@@ -97,7 +97,7 @@ Not a list, not a table — a single-record viewer with keyboard navigation:
 - No single source of truth for "how do we parse/emit JSON, YAML, TOML, TOON, JSONL"
 
 **Solution:**
-- Shared format crate in the smidja workspace (like `socket_emit` in nornir) — or a new nornir capability crate
+- Shared format crate in the smidja workspace (like `datagram` in nornir) — or a new nornir capability crate
 - Handles: detection by extension, parsing, conversion between formats, serialization
 - All projects depend on this one crate instead of rolling their own
 - TOON support uses our actual format definition, not a random crates.io crate

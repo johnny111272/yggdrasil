@@ -73,7 +73,7 @@ macOS `say` command with voice synthesis. Full verbal announcement of the event.
 
 In hyperfocus mode, this is exactly what you need — nothing else breaks through deep concentration. In any other state, it can be overwhelming. That's why it has its own independent threshold.
 
-The `speech` field on the datagram controls what gets spoken. If absent, Hlidskjalf can generate from the event type and detail.
+The `speech` field on the datagram controls what gets spoken. If absent, Hlidskjalf can generate from the event kind and detail.
 
 ---
 
@@ -178,7 +178,7 @@ The session chips in the filter bar are living indicators. Their pulse rate corr
 | Critical | Brief bright flash | Critical event just fired |
 | Inactive | Dimmed | No activity for sustained period |
 
-Every datagram type contributes to the pulse rate: tool use events, exchange diffs, alerts, reports. Canaries confirm the session is alive but don't contribute to pulse rate (they're infrastructure, not activity).
+Every datagram kind contributes to the pulse rate: tool use events, exchange diffs, alerts, reports. Canaries confirm the session is alive but don't contribute to pulse rate (they're infrastructure, not activity).
 
 The visual pulse rate and the geiger tick rate express the **same signal in two modalities**. Glance at the bar — bragi's chip is pulsing quickly, phoenix is still. Listen without looking — bragi is ticking steadily, phoenix is silent. Same information, two sensory channels. Your brain uses whichever one it's tuned to.
 

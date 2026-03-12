@@ -44,8 +44,8 @@ None of them felt uncertain while doing it.
 
 ### Confusing the Datagram Schema with HookEvent
 **Detection:** If you find `HookEvent` fields on a datagram struct, or datagram fields on a hook event handler...
-**Why it's wrong:** The canonical `Datagram` struct lives in nornir's `socket_emit` crate with typed `DatagramKind` and `Priority` enums. `hlidskjalf_core` re-exports these types. The legacy `HookEvent` format is backward-compatible but deprecated. New code should emit and consume `Datagram` with enum variants, not strings. The Tauri event name is `"datagram"` (not the old `"hook-event"`).
-**Recovery:** Read HLIDSKJALF_DATAGRAM.md and `schemas/datagram.schema.json`. Check nornir `socket_emit/src/lib.rs` for the canonical struct.
+**Why it's wrong:** The canonical `Datagram` struct lives in nornir's `datagram` crate with typed `DatagramKind` and `Priority` enums. `hlidskjalf_core` re-exports these types. The legacy `HookEvent` format is backward-compatible but deprecated. New code should emit and consume `Datagram` with enum variants, not strings. The Tauri event name is `"datagram"` (not the old `"hook-event"`).
+**Recovery:** Read HLIDSKJALF_DATAGRAM.md and `schemas/datagram.schema.json`. Check nornir `datagram/src/lib.rs` for the canonical struct.
 
 ### Putting Display Logic in Core Crates
 **Detection:** If you find HTML, CSS, component references, or frontend formatting in a `*_core` crate...
@@ -69,7 +69,7 @@ None of them felt uncertain while doing it.
 | Document | Path | What it tells you |
 |----------|------|-------------------|
 | **PLAN_UNIFIED_SHELL** | `PLAN_UNIFIED_SHELL.md` | The unified shell architecture: tab strip, command prefixing, vite aliases, view component contracts, deployment strategy |
-| **DATAGRAM_SPECIFICATION** | `DATAGRAM_SPECIFICATION.md` | Datagram format, field definitions, priority levels, type enum, backward compatibility with HookEvent |
+| **DATAGRAM_SPECIFICATION** | `DATAGRAM_SPECIFICATION.md` | Datagram format, field definitions, priority levels, kind enum, backward compatibility with HookEvent |
 | **HLIDSKJALF_DATAGRAM** | `HLIDSKJALF_DATAGRAM.md` | Hlidskjalf-specific datagram handling, socket protocol, event emission |
 | **DISPLAY_AND_FILTERING** | `DISPLAY_AND_FILTERING.md` | Exchange diff display design, filter bar, session management, workspace chips |
 | **NEURODIVERGENT_MODALITIES** | `NEURODIVERGENT_MODALITIES.md` | Multi-modal alert system: LED, click, pulse, flash, speech. Profiles, geiger counter, ambient awareness |

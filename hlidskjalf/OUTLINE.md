@@ -11,9 +11,9 @@
 │  Frontend (Svelte 5)           │  Backend (Rust)            │
 │  ─────────────────────         │  ────────────────          │
 │  • Real-time event feed        │  • Unix socket listener    │
-│  • Priority/type filtering     │  • Datagram parsing        │
+│  • Priority/kind filtering     │  • Datagram parsing        │
 │  • Voice alert controls        │  • Lockfile monitoring     │
-│  • GleipnirReport renderer     │  • Log rotation            │
+│  • QualityReport renderer     │  • Log rotation            │
 │  • Auto-scroll                 │  • Speech (macOS say)      │
 │  • Datagram payload display    │  • start_all() orchestr.   │
 └─────────────────────────────────────────────────────────────┘
@@ -32,7 +32,7 @@ hlidskjalf/
 ├── src/
 │   └── lib/
 │       ├── HlidskjalfView.svelte   # Event feed UI (git add -f required)
-│       └── GleipnirReport.svelte   # Gleipnir/syn report payload renderer
+│       └── QualityReport.svelte   # Quality datagram payload renderer
 │   └── routes/
 │       └── +page.svelte            # Thin wrapper: <HlidskjalfView />
 ├── src-tauri/
@@ -51,7 +51,7 @@ hlidskjalf/
 `core/hlidskjalf_core/` — pure Rust, no Tauri dependency.
 
 Key exports:
-- `Datagram`, `DatagramKind`, `Priority` — re-exported from `socket_emit` (nornir)
+- `Datagram`, `DatagramKind`, `Priority` — re-exported from `datagram` (nornir)
 - `HookEvent` — legacy format, backward compatible
 - `start_all(sender)` — orchestration: rotate log, init lockfiles, start listener, start lockfile monitor
 - `speak(text)` — macOS `say` voice synthesis

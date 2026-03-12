@@ -22,25 +22,26 @@ The control plane belongs to nobody. Hlidskjalf is the most convenient dashboard
 
 1. **Never filter input, only filter display.** Every datagram arrives and is stored. Visibility and speech are controlled at the receiver, never at the sender.
 2. **Persistence.** Rolling `.jsonl` log retains at least 24 hours of events for pattern analysis and replay.
-3. **Sender knows its message.** Events with known formats include their own speech text and display data. Hlidskjalf doesn't need to understand every event type — it just needs to classify and route.
-4. **Known types get handlers.** Syn reports, hook intercepts, and other well-defined formats get dedicated rendering in the UI. Unknown types get generic display based on classification fields.
+3. **Sender knows its message.** Events with known formats include their own speech text and display data. Hlidskjalf doesn't need to understand every event kind — it just needs to classify and route.
+4. **Known kinds get handlers.** Syn quality reports, traffic datagrams, and other well-defined formats get dedicated rendering in the UI. Unknown kinds get generic display based on classification fields.
 5. **Lockfile triggers.** System-level behaviors (kill switch, forced scans) are controlled through lockfiles on disk — simple, inspectable, language-agnostic.
 
-## Event Classes
+## Kind Enum
 
-| Class | Purpose | Examples |
-|-------|---------|----------|
-| **alert** | Something happened that needs attention | Hook intercepts, security violations, errors |
-| **report** | Structured results from a scan or process | Syn reports, saga outcomes |
-| **canary** | Proof-of-life from infrastructure components | System prompt section active, hook alive, settings intact |
+| Kind | Purpose | Examples |
+|------|---------|----------|
+| **alert** | Something happened that needs attention | Security violations, denied actions, errors |
+| **quality** | Code quality report — issues grouped by check type | Syn scan results, gleipnir findings |
+| **canary** | Proof-of-life from infrastructure components | Session alive, hook active, settings intact |
 | **notify** | Status updates from automated processes | Subagent finished, build complete, task progress |
+| **traffic** | API round-trip semantic diff | Bifrost exchange diffs, compaction alerts |
 
 ## Classification Dimensions
 
 | Field | Purpose |
 |-------|---------|
-| **source** | Which component sent it (hook, syn, subagent, canary, saga, manual) |
-| **type** | Event class (alert, report, canary, notify) |
+| **source** | Which binary sent it (syn, bifrost, lockfile_monitor, send_alert) |
+| **kind** | Content type (alert, quality, canary, notify, traffic) |
 | **priority** | Threshold level for display and speech gating |
 | **workspace** | Which project context produced the event |
 
@@ -67,8 +68,8 @@ All datagrams are JSON objects, one per line (newline-delimited), sent over the 
 ```json
 {
   "timestamp": 1709712000.0,
-  "source": "hook_intercept_llm_tool",
-  "type": "alert",
+  "source": "syn",
+  "kind": "alert",
   "priority": "high",
   "workspace": "bragi"
 }
@@ -85,8 +86,8 @@ All datagrams are JSON objects, one per line (newline-delimited), sent over the 
 ```
 
 - **detail** — Short human-readable description for the event feed
-- **speech** — If set, Hlidskjalf speaks this text directly (gated by priority threshold). If absent, Hlidskjalf generates speech from the type-specific handler or a generic template
-- **payload** — Type-specific structured data. Syn reports carry their full groups here. Hook intercepts carry file paths, categories, decisions
+- **speech** — If set, Hlidskjalf speaks this text directly (gated by priority threshold). If absent, Hlidskjalf generates speech from the kind-specific handler or a generic template
+- **payload** — Kind-specific structured data. Quality reports carry their full groups here. Traffic datagrams carry exchange diffs
 
 ### Migration from Current Format
 
@@ -219,12 +220,12 @@ Subagents get a restricted set. Main LLM sessions may get more. You control the 
 
 ### Completed
 
-1. Datagram format standardized — `Datagram` struct with typed `DatagramKind` and `Priority` enums in nornir's `socket_emit`
-2. `hlidskjalf_core` imports from `socket_emit` via cross-repo path dependency
+1. Datagram format standardized — `Datagram` struct with typed `DatagramKind` and `Priority` enums in nornir's `datagram`
+2. `hlidskjalf_core` imports from `datagram` via cross-repo path dependency
 3. Rolling `.jsonl` log — write on receive in hlidskjalf_core
 4. Sender binaries — `send_heartbeat`, `send_notification`, `send_warning`, `send_alert`, `send_datagram` (all using typed enums)
 5. Kill switch — lockfile checks via `init_lockfiles` + `start_lockfile_monitor` in hlidskjalf_core
-6. Display filtering UI — type filter + priority threshold in HlidskjalfView
+6. Display filtering UI — kind filter + priority threshold in HlidskjalfView
 7. Speech threshold — cyclable in HlidskjalfView frontend
 
 ### Remaining
