@@ -120,6 +120,13 @@ fn extract_type(fields: &serde_json::Map<String, Value>) -> String {
     }
 }
 
+fn into_object(value: Value) -> Option<serde_json::Map<String, Value>> {
+    match value {
+        Value::Object(map) => Some(map),
+        _ => None,
+    }
+}
+
 fn is_reference_value(json_value: &Value) -> bool {
     match json_value {
         Value::Object(fields) => fields.contains_key("@id"),
@@ -131,10 +138,9 @@ fn is_reference_value(json_value: &Value) -> bool {
     }
 }
 
-fn collect_non_ld_metadata(fields: &serde_json::Map<String, Value>, skip_keys: &[&str]) -> HashMap<String, Value> {
-    fields.iter()
+fn collect_non_ld_metadata(fields: serde_json::Map<String, Value>, skip_keys: &[&str]) -> HashMap<String, Value> {
+    fields.into_iter()
         .filter(|(key, _)| !key.starts_with('@') && !skip_keys.contains(&key.as_str()))
-        .map(|(key, val)| (key.to_string(), val.clone()))
         .collect()
 }
 
@@ -142,20 +148,21 @@ fn collect_non_ld_metadata(fields: &serde_json::Map<String, Value>, skip_keys: &
 // Embedded Graph Parsing (nodes/edges format)
 // ============================================================================
 
-fn parse_embedded_node(node_obj: &serde_json::Map<String, Value>) -> Option<GraphNode> {
-    let id = str_field(node_obj, "@id").unwrap_or("").to_string();
+fn parse_embedded_node(node_obj: serde_json::Map<String, Value>) -> Option<GraphNode> {
+    let id = str_field(&node_obj, "@id").unwrap_or("").to_string();
     if id.is_empty() {
         return None;
     }
 
-    let label = str_field(node_obj, "label")
+    let label = str_field(&node_obj, "label")
         .map(String::from)
-        .unwrap_or_else(|| extract_label(node_obj, &id));
+        .unwrap_or_else(|| extract_label(&node_obj, &id));
+    let node_type = extract_type(&node_obj);
 
     Some(GraphNode {
         id,
         label,
-        node_type: extract_type(node_obj),
+        node_type,
         color: None,
         metadata: collect_non_ld_metadata(node_obj, &["label"]),
     })
@@ -191,22 +198,30 @@ fn parse_embedded_edge(edge_obj: &serde_json::Map<String, Value>) -> Option<Grap
     })
 }
 
-fn parse_embedded_graph(value: &Value) -> Result<GraphData, String> {
-    let fields = value.as_object().ok_or("Expected object with nodes and edges")?;
+fn parse_embedded_graph(value: Value) -> Result<GraphData, String> {
+    let mut fields = match value {
+        Value::Object(map) => map,
+        _ => return Err("Expected object with nodes and edges".into()),
+    };
 
-    let nodes: Vec<GraphNode> = fields.get("nodes")
-        .and_then(|v| v.as_array())
-        .map(|arr| arr.iter().filter_map(|v| v.as_object().and_then(parse_embedded_node)).collect())
+    let nodes: Vec<GraphNode> = fields.remove("nodes")
+        .and_then(|v| match v { Value::Array(arr) => Some(arr), _ => None })
+        .map(|arr| arr.into_iter()
+            .filter_map(|v| match v { Value::Object(map) => Some(map), _ => None })
+            .filter_map(parse_embedded_node)
+            .collect())
         .unwrap_or_default();
 
-    let edges: Vec<GraphEdge> = fields.get("edges")
-        .and_then(|v| v.as_array())
-        .map(|arr| arr.iter().filter_map(|v| v.as_object().and_then(parse_embedded_edge)).collect())
+    let edges: Vec<GraphEdge> = fields.remove("edges")
+        .and_then(|v| match v { Value::Array(arr) => Some(arr), _ => None })
+        .map(|arr| arr.iter()
+            .filter_map(|v| v.as_object().and_then(parse_embedded_edge))
+            .collect())
         .unwrap_or_default();
 
     let meta_keys: &[&str] = &["name", "description", "@id", "@type"];
     let metadata: HashMap<String, Value> = meta_keys.iter()
-        .filter_map(|&key| fields.get(key).map(|val| (key.to_string(), val.clone())))
+        .filter_map(|&key| fields.remove(key).map(|val| (key.into(), val)))
         .collect();
 
     Ok(GraphData { nodes, edges, metadata })
@@ -216,22 +231,22 @@ fn parse_embedded_graph(value: &Value) -> Result<GraphData, String> {
 // JSON-LD Graph Parsing (@id/@graph format)
 // ============================================================================
 
-fn collect_ld_objects(value: &Value) -> Result<Vec<&serde_json::Map<String, Value>>, String> {
+fn collect_ld_objects(value: Value) -> Result<Vec<serde_json::Map<String, Value>>, String> {
     match value {
-        Value::Object(fields) => {
-            if let Some(Value::Array(graph)) = fields.get("@graph") {
-                Ok(graph.iter().filter_map(|v| v.as_object()).collect())
+        Value::Object(mut fields) => {
+            if let Some(Value::Array(graph)) = fields.remove("@graph") {
+                Ok(graph.into_iter().filter_map(into_object).collect())
             } else if fields.contains_key("@id") {
                 Ok(vec![fields])
             } else {
-                Ok(fields.values()
-                    .filter_map(|v| v.as_object())
-                    .filter(|fields| fields.contains_key("@id"))
+                Ok(fields.into_iter()
+                    .filter_map(|(_, val)| into_object(val))
+                    .filter(|map| map.contains_key("@id"))
                     .collect())
             }
         }
-        Value::Array(items) => Ok(items.iter().filter_map(|v| v.as_object()).collect()),
-        _ => Err("Invalid JSON-LD: expected object or array".to_string()),
+        Value::Array(items) => Ok(items.into_iter().filter_map(into_object).collect()),
+        _ => Err("Invalid JSON-LD: expected object or array".into()),
     }
 }
 
@@ -250,7 +265,7 @@ fn extract_target_ids(json_value: &Value) -> Vec<&str> {
     }
 }
 
-fn jsonld_to_graph(value: &Value) -> Result<GraphData, String> {
+fn jsonld_to_graph(value: Value) -> Result<GraphData, String> {
     if let Value::Object(ref fields) = value {
         if fields.contains_key("nodes") && fields.contains_key("edges") {
             return parse_embedded_graph(value);
@@ -260,40 +275,21 @@ fn jsonld_to_graph(value: &Value) -> Result<GraphData, String> {
     let objects = collect_ld_objects(value)?;
 
     let mut nodes: Vec<GraphNode> = Vec::new();
-    let mut node_ids: HashSet<&str> = HashSet::new();
-
-    for fields in &objects {
-        let Some(id) = str_field(fields, "@id") else { continue };
-        if !node_ids.insert(id) { continue; }
-
-        let metadata: HashMap<String, Value> = fields.iter()
-            .filter(|(key, val)| {
-                !key.starts_with('@')
-                    && !["name", "label", "title"].contains(&key.as_str())
-                    && !is_reference_value(val)
-            })
-            .map(|(key, val)| (key.to_string(), val.clone()))
-            .collect();
-
-        nodes.push(GraphNode {
-            id: id.to_string(),
-            label: extract_label(fields, id),
-            node_type: extract_type(fields),
-            color: None,
-            metadata,
-        });
-    }
-
     let mut edges: Vec<GraphEdge> = Vec::new();
-    for fields in &objects {
-        let Some(source_id) = str_field(fields, "@id") else { continue };
+    let mut node_ids: HashSet<String> = HashSet::new();
+
+    for fields in objects {
+        let Some(id_ref) = str_field(&fields, "@id") else { continue };
+        let id = String::from(id_ref);
+        if !node_ids.insert(id.clone()) { continue; }
+
+        // Scan reference fields for edges (borrows fields)
         for (key, val) in fields.iter() {
             if key.starts_with('@') { continue; }
             for target_id in extract_target_ids(val) {
-                if !node_ids.contains(target_id) { continue; }
                 let short_key = local_name(key);
                 edges.push(GraphEdge {
-                    source: source_id.to_string(),
+                    source: id.clone(),
                     target: target_id.to_string(),
                     label: short_key.to_string(),
                     edge_type: short_key.to_string(),
@@ -301,7 +297,23 @@ fn jsonld_to_graph(value: &Value) -> Result<GraphData, String> {
                 });
             }
         }
+
+        // Extract label/type by reference, then consume fields into metadata
+        let label = extract_label(&fields, &id);
+        let node_type = extract_type(&fields);
+        let metadata: HashMap<String, Value> = fields.into_iter()
+            .filter(|(key, val)| {
+                !key.starts_with('@')
+                    && !["name", "label", "title"].contains(&key.as_str())
+                    && !is_reference_value(val)
+            })
+            .collect();
+
+        nodes.push(GraphNode { id, label, node_type, color: None, metadata });
     }
+
+    // Filter edges to only reference known nodes
+    edges.retain(|edge| node_ids.contains(&edge.target));
 
     Ok(GraphData { nodes, edges, metadata: HashMap::new() })
 }
@@ -450,52 +462,52 @@ fn load_jsonld_with_refs(path: &Path) -> Result<GraphData, String> {
 }
 
 fn build_graph_from_value(
-    value: &Value,
-    config: &MergeConfig,
+    value: Value,
+    prefix: Option<&str>,
+    default_color: Option<&str>,
     combined_join_on: &HashSet<String>,
     combined_stylesheet: &HashMap<String, String>,
 ) -> Result<GraphData, String> {
-    if let Value::Object(ref fields) = value {
-        if fields.contains_key("nodes") && fields.contains_key("edges") {
-            let mut embedded = parse_embedded_graph(value)?;
-            if let Some(ref prefix) = config.prefix {
-                prefix_graph_ids(&mut embedded, prefix, combined_join_on);
-            }
-            apply_colors(&mut embedded, combined_stylesheet, config.color.as_deref());
-            return Ok(embedded);
-        }
+    let has_embedded = matches!(&value, Value::Object(fields) if fields.contains_key("nodes") && fields.contains_key("edges"));
+    let is_object = matches!(&value, Value::Object(_));
 
-        let id = str_field(fields, "@id").unwrap_or("root");
-        let label = str_field(fields, "name").unwrap_or(id);
+    if has_embedded {
+        let mut graph = parse_embedded_graph(value)?;
+        if let Some(pfx) = prefix {
+            prefix_graph_ids(&mut graph, pfx, combined_join_on);
+        }
+        apply_colors(&mut graph, combined_stylesheet, default_color);
+        return Ok(graph);
+    }
+
+    if is_object {
+        let Value::Object(mut fields) = value else { unreachable!() };
+        let id = str_field(&fields, "@id").unwrap_or("root").to_string();
+        let label = str_field(&fields, "name").unwrap_or(&id).to_string();
+        let node_type = extract_type(&fields);
 
         let mut metadata: HashMap<String, Value> = HashMap::new();
-        if let Some(desc) = fields.get("description") {
-            metadata.insert("description".to_string(), desc.clone());
+        if let Some(desc) = fields.remove("description") {
+            metadata.insert("description".into(), desc);
         }
 
-        let color = combined_stylesheet.get(label)
+        let color = combined_stylesheet.get(label.as_str())
             .map(|c| c.to_string())
-            .or_else(|| config.color.clone());
+            .or_else(|| default_color.map(String::from));
 
         return Ok(GraphData {
-            nodes: vec![GraphNode {
-                id: id.to_string(),
-                label: label.to_string(),
-                node_type: extract_type(fields),
-                color,
-                metadata,
-            }],
+            nodes: vec![GraphNode { id, label, node_type, color, metadata }],
             edges: vec![],
             metadata: HashMap::new(),
         });
     }
 
-    let mut parsed = jsonld_to_graph(value)?;
-    if let Some(ref prefix) = config.prefix {
-        prefix_graph_ids(&mut parsed, prefix, combined_join_on);
+    let mut graph = jsonld_to_graph(value)?;
+    if let Some(pfx) = prefix {
+        prefix_graph_ids(&mut graph, pfx, combined_join_on);
     }
-    apply_colors(&mut parsed, combined_stylesheet, config.color.as_deref());
-    Ok(parsed)
+    apply_colors(&mut graph, combined_stylesheet, default_color);
+    Ok(graph)
 }
 
 fn merge_referenced_graphs(
@@ -513,8 +525,8 @@ fn merge_referenced_graphs(
                 graph.edges.push(GraphEdge {
                     source: parent.id.clone(),
                     target: ref_root.id.clone(),
-                    label: "gates".to_string(),
-                    edge_type: "reference".to_string(),
+                    label: "gates".into(),
+                    edge_type: "reference".into(),
                     weight: 1.0,
                 });
             }
@@ -542,14 +554,22 @@ fn load_jsonld_with_refs_inner(
 
     let base_dir = path.parent().unwrap_or(Path::new("."));
     let config = extract_merge_config(&value);
+    let prefix = config.prefix;
+    let default_color = config.color;
 
-    traversal.join_on.extend(config.join_on.iter().cloned());
-    for (label, color) in &config.stylesheet {
-        traversal.stylesheet.entry(label.clone()).or_insert_with(|| color.clone());
+    traversal.join_on.extend(config.join_on);
+    for (label, color) in config.stylesheet {
+        traversal.stylesheet.entry(label).or_insert(color);
     }
 
     let refs = extract_references(&value);
-    let mut graph = build_graph_from_value(&value, &config, &traversal.join_on, &traversal.stylesheet)?;
+    let mut graph = build_graph_from_value(
+        value,
+        prefix.as_deref(),
+        default_color.as_deref(),
+        &traversal.join_on,
+        &traversal.stylesheet,
+    )?;
 
     merge_referenced_graphs(&mut graph, refs, base_dir, traversal);
     deduplicate_nodes(&mut graph);
@@ -645,7 +665,7 @@ pub fn generate_sample_graph() -> GraphData {
             source: source.to_string(),
             target: target.to_string(),
             label: label.to_string(),
-            edge_type: "dependency".to_string(),
+            edge_type: "dependency".into(),
             weight: 1.0,
         }
     };
