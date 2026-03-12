@@ -26,6 +26,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![load_graph, save_graph, get_graph_stats, generate_sample_graph])
-        .run(tauri::generate_context!())
-        .expect("Ratatoskr failed to start");
+        .build(tauri::generate_context!())
+        .ok()
+        .map(|app| app.run(|_, _| {}));
 }

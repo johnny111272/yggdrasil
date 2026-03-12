@@ -1,4 +1,4 @@
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::path::Path;
 
 // ============================================================================
@@ -53,11 +53,24 @@ pub struct JsonlEntry {
     pub entry_count: usize,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TableData {
+    pub path: String,
+    pub headers: Vec<String>,
+    pub rows: Vec<Vec<String>>,
+    pub row_count: usize,
+    pub column_count: usize,
+    pub source_format: String,
+    pub size_bytes: u64,
+}
+
+const MAX_TABLE_ROWS: usize = 100_000;
+
 // ============================================================================
 // Public Functions
 // ============================================================================
 
-pub fn list_directory(directory: &str) -> Result<Vec<KvasFileTreeEntry>, String> {
+pub fn list_directory(directory: &str, show_hidden: bool) -> Result<Vec<KvasFileTreeEntry>, String> {
     let dir_path = Path::new(directory);
     if !dir_path.is_dir() {
         return Err(format!("Not a directory: {}", directory));
@@ -72,7 +85,7 @@ pub fn list_directory(directory: &str) -> Result<Vec<KvasFileTreeEntry>, String>
         let path = entry.path();
         let name = entry.file_name().to_string_lossy().to_string();
 
-        if name.starts_with('.') {
+        if !show_hidden && name.starts_with('.') {
             continue;
         }
 
@@ -199,15 +212,19 @@ pub fn convert_to_all_formats(content: &str, source_format: &str) -> Result<AllF
 pub fn detect_data_format(path: &str) -> Option<String> {
     let file_path = Path::new(path);
     let ext = effective_extension(file_path);
-    match ext.as_str() {
-        "json" | "jsonld" | "qa" | "meta" | "index" => Some("json".to_string()),
-        "jsonl" => Some("jsonl".to_string()),
-        "yaml" | "yml" => Some("yaml".to_string()),
-        "toml" => Some("toml".to_string()),
-        "toon" => Some("toon".to_string()),
-        "ron" => Some("ron".to_string()),
-        _ => None,
-    }
+    let format = match ext.as_str() {
+        "json" | "jsonld" | "qa" | "meta" | "index" => "json",
+        "jsonl" => "jsonl",
+        "yaml" | "yml" => "yaml",
+        "toml" => "toml",
+        "toon" => "toon",
+        "ron" => "ron",
+        "csv" => "csv",
+        "tsv" => "tsv",
+        "parquet" => "parquet",
+        _ => return None,
+    };
+    Some(format.into())
 }
 
 pub fn read_jsonl_info(path: &str) -> Result<JsonlInfo, String> {
@@ -293,6 +310,50 @@ pub fn export_entry_as(
     Ok(path.to_string_lossy().to_string())
 }
 
+pub fn read_table(path: &str) -> Result<TableData, String> {
+    let file_path = Path::new(path);
+    if !file_path.is_file() {
+        return Err(format!("Not a file: {}", path));
+    }
+
+    let ext = effective_extension(file_path);
+    match ext.as_str() {
+        "csv" => read_csv_table(file_path, b','),
+        "tsv" => read_csv_table(file_path, b'\t'),
+        "parquet" => read_parquet_table(file_path),
+        _ => Err(format!("Not a tabular format: {}", ext)),
+    }
+}
+
+pub fn export_table_csv(
+    headers: Vec<String>,
+    rows: Vec<Vec<String>>,
+    source_path: &str,
+) -> Result<String, String> {
+    let source = Path::new(source_path);
+    let stem = source.file_stem()
+        .map(|s| s.to_string_lossy().to_string())
+        .unwrap_or_else(|| "table".into());
+
+    let dir = source.parent().unwrap_or_else(|| Path::new("."));
+    let output_path = dir.join(format!("{}_resorted.csv", stem));
+
+    let file = std::fs::File::create(&output_path)
+        .map_err(|e| format!("Failed to create {}: {}", output_path.display(), e))?;
+
+    let mut writer = csv::Writer::from_writer(file);
+    writer.write_record(&headers)
+        .map_err(|e| format!("Failed to write headers: {}", e))?;
+    for row in &rows {
+        writer.write_record(row)
+            .map_err(|e| format!("Failed to write row: {}", e))?;
+    }
+    writer.flush()
+        .map_err(|e| format!("Failed to flush: {}", e))?;
+
+    Ok(output_path.to_string_lossy().to_string())
+}
+
 // ============================================================================
 // Internal Helpers
 // ============================================================================
@@ -313,6 +374,113 @@ fn effective_extension(path: &Path) -> String {
 
 fn estimate_token_count(content: &str) -> usize {
     content.len() / 4
+}
+
+fn read_csv_table(file_path: &Path, delimiter: u8) -> Result<TableData, String> {
+    let metadata = std::fs::metadata(file_path)
+        .map_err(|e| format!("Failed to get metadata: {}", e))?;
+
+    let file = std::fs::File::open(file_path)
+        .map_err(|e| format!("Failed to open: {}", e))?;
+
+    let mut reader = csv::ReaderBuilder::new()
+        .delimiter(delimiter)
+        .has_headers(true)
+        .from_reader(file);
+
+    let headers: Vec<String> = reader.headers()
+        .map_err(|e| format!("Failed to read headers: {}", e))?
+        .iter()
+        .map(|h| h.to_string())
+        .collect();
+
+    let column_count = headers.len();
+    let mut rows = Vec::new();
+
+    for result in reader.records() {
+        if rows.len() >= MAX_TABLE_ROWS {
+            break;
+        }
+        let record = result.map_err(|e| format!("CSV parse error at row {}: {}", rows.len() + 1, e))?;
+        let row: Vec<String> = record.iter().map(|f| f.to_string()).collect();
+        rows.push(row);
+    }
+
+    let row_count = rows.len();
+    let source_format = if delimiter == b'\t' { "tsv" } else { "csv" };
+
+    Ok(TableData {
+        path: file_path.to_string_lossy().to_string(),
+        headers,
+        rows,
+        row_count,
+        column_count,
+        source_format: source_format.to_string(),
+        size_bytes: metadata.len(),
+    })
+}
+
+fn read_parquet_table(file_path: &Path) -> Result<TableData, String> {
+    use arrow::array::Array;
+    use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
+
+    let metadata = std::fs::metadata(file_path)
+        .map_err(|e| format!("Failed to get metadata: {}", e))?;
+
+    let file = std::fs::File::open(file_path)
+        .map_err(|e| format!("Failed to open: {}", e))?;
+
+    let builder = ParquetRecordBatchReaderBuilder::try_new(file)
+        .map_err(|e| format!("Failed to read parquet: {}", e))?;
+
+    let schema = builder.schema().clone();
+    let headers: Vec<String> = schema.fields().iter().map(|f| f.name().clone()).collect();
+    let column_count = headers.len();
+
+    let reader = builder
+        .with_batch_size(8192)
+        .build()
+        .map_err(|e| format!("Failed to build parquet reader: {}", e))?;
+
+    let mut rows = Vec::new();
+
+    for batch_result in reader {
+        let batch = batch_result.map_err(|e| format!("Parquet read error: {}", e))?;
+
+        for row_idx in 0..batch.num_rows() {
+            if rows.len() >= MAX_TABLE_ROWS {
+                break;
+            }
+            let mut row = Vec::with_capacity(column_count);
+            for col_idx in 0..batch.num_columns() {
+                let col = batch.column(col_idx);
+                let value = if col.is_null(row_idx) {
+                    String::new()
+                } else {
+                    arrow::util::display::array_value_to_string(col, row_idx)
+                        .unwrap_or_default()
+                };
+                row.push(value);
+            }
+            rows.push(row);
+        }
+
+        if rows.len() >= MAX_TABLE_ROWS {
+            break;
+        }
+    }
+
+    let row_count = rows.len();
+
+    Ok(TableData {
+        path: file_path.to_string_lossy().to_string(),
+        headers,
+        rows,
+        row_count,
+        column_count,
+        source_format: "parquet".into(),
+        size_bytes: metadata.len(),
+    })
 }
 
 fn detect_language(extension: &str) -> String {

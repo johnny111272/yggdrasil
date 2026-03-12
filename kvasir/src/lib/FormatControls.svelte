@@ -94,7 +94,7 @@
   }
 
   .format-btn.source {
-    border: 2px solid var(--severity-info);
+    border: 2px solid var(--action-primary);
   }
 
   .token-stats {
@@ -116,7 +116,7 @@
   }
 
   .token-item.source {
-    color: var(--severity-info);
+    color: var(--action-primary);
   }
 
   .token-item.active {
@@ -129,7 +129,7 @@
   }
 
   .savings.positive {
-    color: var(--severity-info);
+    color: var(--severity-success);
   }
 
   .savings.negative {

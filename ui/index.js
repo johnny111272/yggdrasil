@@ -11,3 +11,4 @@ export { default as ListItem } from './components/ListItem.svelte';
 export { default as SearchInput } from './components/SearchInput.svelte';
 export { default as SidebarLayout } from './components/SidebarLayout.svelte';
 export { default as FilterBanner } from './components/FilterBanner.svelte';
+export { default as ThemeSwitcher } from './components/ThemeSwitcher.svelte';

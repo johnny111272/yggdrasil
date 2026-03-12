@@ -1,0 +1,516 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "validate-datagram-schema-v1",
+  "title": "Hlidskjalf Datagram",
+  "description": "Event datagram for the Hlidskjalf messaging protocol. The envelope is self-describing: kind identifies what the datagram IS (content type), source identifies who SENT it (the emitting binary).",
+  "type": "object",
+  "required": [
+    "timestamp",
+    "source",
+    "kind",
+    "priority",
+    "workspace"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "timestamp": {
+      "type": "number",
+      "description": "Unix epoch timestamp in seconds (float64). When the datagram was created, not received."
+    },
+    "source": {
+      "type": "string",
+      "pattern": "^[a-z0-9_]{1,64}$",
+      "description": "The binary that emitted this datagram via datagram (e.g. \"syn\", \"bifrost\", \"lockfile_monitor\", \"send_alert\")."
+    },
+    "kind": {
+      "type": "string",
+      "enum": [
+        "alert",
+        "canary",
+        "notify",
+        "quality",
+        "traffic"
+      ],
+      "description": "Content type \u2014 what this datagram IS. Drives rendering (which component draws it) and filtering (which chip toggles it)."
+    },
+    "classifier": {
+      "type": "string",
+      "description": "Sub-classification within the kind. Closed enum per kind, required for kinds with significant sub-types (traffic, quality). Absent for simple kinds."
+    },
+    "priority": {
+      "type": "string",
+      "enum": [
+        "critical",
+        "high",
+        "normal",
+        "low",
+        "trace"
+      ],
+      "description": "Severity level for threshold filtering and alert modality activation."
+    },
+    "workspace": {
+      "type": "string",
+      "maxLength": 128,
+      "description": "Project/workspace name (e.g. \"yggdrasil\", \"bragi\"). Empty string if not workspace-scoped."
+    },
+    "detail": {
+      "type": "string",
+      "maxLength": 512,
+      "description": "Human-readable one-line summary. Primary text for simple kinds (alert, canary, notify). May be absent when the payload speaks for itself."
+    },
+    "speech": {
+      "type": "string",
+      "maxLength": 256,
+      "description": "Voice alert text composed for spoken delivery. Triggers TTS when priority exceeds user's speech threshold."
+    },
+    "payload": {
+      "type": "object",
+      "description": "Structured data whose shape is determined by kind. quality: payload.quality.schema.json. traffic: payload.traffic.schema.json. Simple kinds (alert, canary, notify) have no payload."
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "traffic"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "classifier",
+          "payload"
+        ],
+        "properties": {
+          "classifier": {
+            "enum": [
+              "startup",
+              "conversation",
+              "tool",
+              "subagent",
+              "planning"
+            ]
+          },
+          "payload": {
+            "$ref": "#/$defs/traffic_payload"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "quality"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "classifier",
+          "payload"
+        ],
+        "properties": {
+          "classifier": {
+            "enum": [
+              "directory",
+              "single_file"
+            ]
+          },
+          "payload": {
+            "$ref": "#/$defs/quality_payload"
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "quality_check_group": {
+      "type": "object",
+      "required": [
+        "tool",
+        "code",
+        "message",
+        "severity",
+        "count",
+        "file_count",
+        "signal",
+        "direction",
+        "canary",
+        "locations"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "tool": {
+          "type": "string",
+          "description": "Linter/checker tool name (e.g. \"ruff\", \"gleipnir\", \"basedpyright\")."
+        },
+        "code": {
+          "type": "string",
+          "description": "Rule code (e.g. \"E501\", \"G001\", \"F401\")."
+        },
+        "message": {
+          "type": "string",
+          "description": "Representative issue message (from the first issue in the group)."
+        },
+        "severity": {
+          "type": "string",
+          "enum": [
+            "info",
+            "warning",
+            "error",
+            "blocked"
+          ],
+          "description": "Issue severity within the quality report."
+        },
+        "count": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Total number of issues in this group."
+        },
+        "file_count": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Number of unique files containing this issue."
+        },
+        "signal": {
+          "type": "string",
+          "description": "Architectural signal \u2014 what was detected. Empty string when not applicable."
+        },
+        "direction": {
+          "type": "string",
+          "description": "Suggested fix direction. Empty string when not applicable."
+        },
+        "canary": {
+          "type": "string",
+          "description": "Context loss canary token. Empty string when not applicable."
+        },
+        "locations": {
+          "type": "array",
+          "description": "File-aggregated locations. Issues in the same file collapse into one entry.",
+          "items": {
+            "$ref": "#/$defs/quality_location"
+          }
+        }
+      }
+    },
+    "quality_location": {
+      "type": "object",
+      "required": [
+        "file"
+      ],
+      "additionalProperties": false,
+      "description": "Single-line: { file, line }. Multi-line: { file, lines }. Exactly one of line or lines must be present.",
+      "properties": {
+        "file": {
+          "type": "string",
+          "description": "File path relative to workspace root."
+        },
+        "line": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Line number (when file has exactly one issue in this group)."
+        },
+        "lines": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "minItems": 2,
+          "description": "Line numbers (when file has multiple issues in this group)."
+        }
+      },
+      "oneOf": [
+        {
+          "required": [
+            "line"
+          ]
+        },
+        {
+          "required": [
+            "lines"
+          ]
+        }
+      ]
+    },
+    "quality_payload": {
+      "type": "object",
+      "required": [
+        "total",
+        "check_types",
+        "groups"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "total": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Sum of all issue counts across all groups."
+        },
+        "check_types": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of distinct (tool, code) pairs."
+        },
+        "groups": {
+          "type": "array",
+          "description": "One entry per unique (tool, code) combination.",
+          "items": {
+            "$ref": "#/$defs/quality_check_group"
+          }
+        }
+      }
+    },
+    "traffic_tool_input": {
+      "type": "object",
+      "description": "The raw input object passed to a Claude Code tool invocation. Shape varies per tool.",
+      "additionalProperties": true
+    },
+    "traffic_payload": {
+      "type": "object",
+      "required": [
+        "traffic_kind",
+        "system_injection",
+        "source"
+      ],
+      "properties": {
+        "traffic_kind": {
+          "type": "string",
+          "enum": [
+            "startup",
+            "conversation",
+            "tool",
+            "subagent",
+            "planning"
+          ],
+          "description": "Classification of the exchange. startup: session start/resume/post-compaction. conversation: user interaction. tool: non-Task tool use. subagent: Task tool dispatch. planning: EnterPlanMode/ExitPlanMode."
+        },
+        "system_injection": {
+          "type": "boolean",
+          "description": "True when the exchange contains platform-injected system-reminders (not user-generated hooks). User hooks (syn_report, PostToolUse, etc.) are filtered out. Only Anthropic's arbitrary injections set this flag."
+        },
+        "source": {
+          "type": "string",
+          "description": "Reference to the raw exchange in mainexch JSONL. Format: filename:line_number. Clicking navigates to the exact raw API exchange.",
+          "pattern": "^.+\\.jsonl:\\d+$"
+        },
+        "user": {
+          "type": "string",
+          "description": "User-authored text content. Multiple text blocks concatenated with blank line separator."
+        },
+        "assistant": {
+          "type": "string",
+          "description": "Assistant-authored text content (visible response). Multiple text blocks concatenated with blank line separator."
+        },
+        "thinking": {
+          "type": "string",
+          "description": "Assistant's chain-of-thought reasoning. Multiple thinking blocks concatenated with blank line separator."
+        },
+        "system": {
+          "type": "string",
+          "description": "System-reminder text blocks injected into user messages. Includes both user-generated hooks and platform injections. Multiple reminders concatenated with blank line separator."
+        },
+        "tool_return": {
+          "type": "string",
+          "description": "Tool result content. All tool_result blocks regardless of which tool produced them. Multiple results concatenated with blank line separator."
+        },
+        "shell": {
+          "description": "Bash tool invocation(s). Single object if one call, array if multiple.",
+          "oneOf": [
+            {
+              "$ref": "#/$defs/traffic_tool_input"
+            },
+            {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/traffic_tool_input"
+              }
+            }
+          ]
+        },
+        "file_read": {
+          "description": "Read tool invocation(s).",
+          "oneOf": [
+            {
+              "$ref": "#/$defs/traffic_tool_input"
+            },
+            {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/traffic_tool_input"
+              }
+            }
+          ]
+        },
+        "file_write": {
+          "description": "Write tool invocation(s).",
+          "oneOf": [
+            {
+              "$ref": "#/$defs/traffic_tool_input"
+            },
+            {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/traffic_tool_input"
+              }
+            }
+          ]
+        },
+        "file_edit": {
+          "description": "Edit or NotebookEdit tool invocation(s).",
+          "oneOf": [
+            {
+              "$ref": "#/$defs/traffic_tool_input"
+            },
+            {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/traffic_tool_input"
+              }
+            }
+          ]
+        },
+        "file_search": {
+          "description": "Glob tool invocation(s).",
+          "oneOf": [
+            {
+              "$ref": "#/$defs/traffic_tool_input"
+            },
+            {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/traffic_tool_input"
+              }
+            }
+          ]
+        },
+        "text_search": {
+          "description": "Grep tool invocation(s).",
+          "oneOf": [
+            {
+              "$ref": "#/$defs/traffic_tool_input"
+            },
+            {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/traffic_tool_input"
+              }
+            }
+          ]
+        },
+        "web_search": {
+          "description": "WebSearch tool invocation(s).",
+          "oneOf": [
+            {
+              "$ref": "#/$defs/traffic_tool_input"
+            },
+            {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/traffic_tool_input"
+              }
+            }
+          ]
+        },
+        "web_fetch": {
+          "description": "WebFetch tool invocation(s).",
+          "oneOf": [
+            {
+              "$ref": "#/$defs/traffic_tool_input"
+            },
+            {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/traffic_tool_input"
+              }
+            }
+          ]
+        },
+        "agent_dispatch": {
+          "description": "Task tool invocation(s) \u2014 subagent dispatch.",
+          "oneOf": [
+            {
+              "$ref": "#/$defs/traffic_tool_input"
+            },
+            {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/traffic_tool_input"
+              }
+            }
+          ]
+        },
+        "ask_question": {
+          "description": "AskUserQuestion tool invocation(s).",
+          "oneOf": [
+            {
+              "$ref": "#/$defs/traffic_tool_input"
+            },
+            {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/traffic_tool_input"
+              }
+            }
+          ]
+        },
+        "start_plan": {
+          "description": "EnterPlanMode tool invocation.",
+          "oneOf": [
+            {
+              "$ref": "#/$defs/traffic_tool_input"
+            },
+            {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/traffic_tool_input"
+              }
+            }
+          ]
+        },
+        "finish_plan": {
+          "description": "ExitPlanMode tool invocation.",
+          "oneOf": [
+            {
+              "$ref": "#/$defs/traffic_tool_input"
+            },
+            {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/traffic_tool_input"
+              }
+            }
+          ]
+        },
+        "tool_use": {
+          "description": "Generic tool invocation(s) for unmapped tool names (TaskUpdate, TaskOutput, LSP, etc.).",
+          "oneOf": [
+            {
+              "$ref": "#/$defs/traffic_tool_input"
+            },
+            {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/traffic_tool_input"
+              }
+            }
+          ]
+        },
+        "instructions": {
+          "type": "string",
+          "description": "New system prompt blocks (CLAUDE.md additions, workspace instructions). Text content of diff_system_blocks, concatenated with blank line separator."
+        },
+        "tools_added": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Names of newly appeared tool definitions (e.g. when MCP tools load or session tools change)."
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

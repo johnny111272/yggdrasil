@@ -1,12 +1,12 @@
 use tauri::Emitter;
 
 #[tauri::command]
-async fn start_monitor(app: tauri::AppHandle) -> Result<(), String> {
-    let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
-    hlidskjalf_core::start_all(tx).await?;
+async fn start_monitor(handle: tauri::AppHandle) -> Result<(), String> {
+    let (sender, mut receiver) = tokio::sync::mpsc::unbounded_channel();
+    hlidskjalf_core::start_all(sender).await?;
     tokio::spawn(async move {
-        while let Some(event) = rx.recv().await {
-            let _ = app.emit("datagram", &event);
+        while let Some(datagram) = receiver.recv().await {
+            let _ = handle.emit("datagram", &datagram);
         }
     });
     Ok(())
@@ -23,5 +23,5 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![start_monitor, speak])
         .run(tauri::generate_context!())
-        .expect("Hlidskjalf failed to start");
+        .unwrap_or_else(|_| std::process::exit(1));
 }

@@ -1,0 +1,152 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "payload.traffic.schema.json",
+  "title": "Traffic Datagram Payload",
+  "description": "Payload for kind: traffic datagrams. Emitted by bifrost. Each record represents the semantic diff between consecutive Claude API exchanges, flattened from the raw role/content-block format into labeled fields.",
+  "type": "object",
+  "required": ["traffic_kind", "system_injection", "source"],
+  "properties": {
+    "traffic_kind": {
+      "type": "string",
+      "enum": ["startup", "conversation", "tool", "subagent", "planning"],
+      "description": "Classification of the exchange. startup: session start/resume/post-compaction. conversation: user interaction. tool: non-Task tool use. subagent: Task tool dispatch. planning: EnterPlanMode/ExitPlanMode."
+    },
+    "system_injection": {
+      "type": "boolean",
+      "description": "True when the exchange contains platform-injected system-reminders (not user-generated hooks). User hooks (syn_report, PostToolUse, etc.) are filtered out. Only Anthropic's arbitrary injections set this flag."
+    },
+    "source": {
+      "type": "string",
+      "description": "Reference to the raw exchange in mainexch JSONL. Format: filename:line_number. Clicking navigates to the exact raw API exchange.",
+      "pattern": "^.+\\.jsonl:\\d+$"
+    },
+    "user": {
+      "type": "string",
+      "description": "User-authored text content. Multiple text blocks concatenated with blank line separator."
+    },
+    "assistant": {
+      "type": "string",
+      "description": "Assistant-authored text content (visible response). Multiple text blocks concatenated with blank line separator."
+    },
+    "thinking": {
+      "type": "string",
+      "description": "Assistant's chain-of-thought reasoning. Multiple thinking blocks concatenated with blank line separator."
+    },
+    "system": {
+      "type": "string",
+      "description": "System-reminder text blocks injected into user messages. Includes both user-generated hooks and platform injections. Multiple reminders concatenated with blank line separator."
+    },
+    "tool_return": {
+      "type": "string",
+      "description": "Tool result content. All tool_result blocks regardless of which tool produced them. Multiple results concatenated with blank line separator."
+    },
+    "shell": {
+      "description": "Bash tool invocation(s). Single object if one call, array if multiple.",
+      "oneOf": [
+        { "$ref": "#/$defs/tool_input" },
+        { "type": "array", "items": { "$ref": "#/$defs/tool_input" } }
+      ]
+    },
+    "file_read": {
+      "description": "Read tool invocation(s).",
+      "oneOf": [
+        { "$ref": "#/$defs/tool_input" },
+        { "type": "array", "items": { "$ref": "#/$defs/tool_input" } }
+      ]
+    },
+    "file_write": {
+      "description": "Write tool invocation(s).",
+      "oneOf": [
+        { "$ref": "#/$defs/tool_input" },
+        { "type": "array", "items": { "$ref": "#/$defs/tool_input" } }
+      ]
+    },
+    "file_edit": {
+      "description": "Edit or NotebookEdit tool invocation(s).",
+      "oneOf": [
+        { "$ref": "#/$defs/tool_input" },
+        { "type": "array", "items": { "$ref": "#/$defs/tool_input" } }
+      ]
+    },
+    "file_search": {
+      "description": "Glob tool invocation(s).",
+      "oneOf": [
+        { "$ref": "#/$defs/tool_input" },
+        { "type": "array", "items": { "$ref": "#/$defs/tool_input" } }
+      ]
+    },
+    "text_search": {
+      "description": "Grep tool invocation(s).",
+      "oneOf": [
+        { "$ref": "#/$defs/tool_input" },
+        { "type": "array", "items": { "$ref": "#/$defs/tool_input" } }
+      ]
+    },
+    "web_search": {
+      "description": "WebSearch tool invocation(s).",
+      "oneOf": [
+        { "$ref": "#/$defs/tool_input" },
+        { "type": "array", "items": { "$ref": "#/$defs/tool_input" } }
+      ]
+    },
+    "web_fetch": {
+      "description": "WebFetch tool invocation(s).",
+      "oneOf": [
+        { "$ref": "#/$defs/tool_input" },
+        { "type": "array", "items": { "$ref": "#/$defs/tool_input" } }
+      ]
+    },
+    "agent_dispatch": {
+      "description": "Task tool invocation(s) — subagent dispatch.",
+      "oneOf": [
+        { "$ref": "#/$defs/tool_input" },
+        { "type": "array", "items": { "$ref": "#/$defs/tool_input" } }
+      ]
+    },
+    "ask_question": {
+      "description": "AskUserQuestion tool invocation(s).",
+      "oneOf": [
+        { "$ref": "#/$defs/tool_input" },
+        { "type": "array", "items": { "$ref": "#/$defs/tool_input" } }
+      ]
+    },
+    "start_plan": {
+      "description": "EnterPlanMode tool invocation.",
+      "oneOf": [
+        { "$ref": "#/$defs/tool_input" },
+        { "type": "array", "items": { "$ref": "#/$defs/tool_input" } }
+      ]
+    },
+    "finish_plan": {
+      "description": "ExitPlanMode tool invocation.",
+      "oneOf": [
+        { "$ref": "#/$defs/tool_input" },
+        { "type": "array", "items": { "$ref": "#/$defs/tool_input" } }
+      ]
+    },
+    "tool_use": {
+      "description": "Generic tool invocation(s) for unmapped tool names (TaskUpdate, TaskOutput, LSP, etc.).",
+      "oneOf": [
+        { "$ref": "#/$defs/tool_input" },
+        { "type": "array", "items": { "$ref": "#/$defs/tool_input" } }
+      ]
+    },
+    "instructions": {
+      "type": "string",
+      "description": "New system prompt blocks (CLAUDE.md additions, workspace instructions). Text content of diff_system_blocks, concatenated with blank line separator."
+    },
+    "tools_added": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Names of newly appeared tool definitions (e.g. when MCP tools load or session tools change)."
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "tool_input": {
+      "type": "object",
+      "description": "The raw input object passed to a Claude Code tool invocation. Shape varies per tool.",
+      "additionalProperties": true
+    }
+  }
+}

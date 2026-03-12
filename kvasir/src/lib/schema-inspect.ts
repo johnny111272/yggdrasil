@@ -739,50 +739,72 @@ export function analyzeSchema(rawJson: string): InspectedSchema {
   let totalSemantic = 0;
   let totalLeaf = 0;
 
-  for (const [sectionName, sectionSchema] of Object.entries(properties)) {
-    const [unwrapped, nullable] = unwrapNullable(sectionSchema);
+  // Detect flat schemas: if no top-level property is an object with sub-properties,
+  // treat the entire schema as a single root section processed by analyzeObject.
+  const hasObjectSections = Object.values(properties).some((propSchema) => {
+    const [unwrapped] = unwrapNullable(propSchema as SchemaNode);
+    return unwrapped["type"] === "object" && unwrapped["properties"];
+  });
 
-    // Section-level requirement
-    const isRequired = requiredSet.has(sectionName);
-    const sectionReq = isRequired
-      ? { label: "REQUIRED", cssClass: "req-required" }
-      : nullable
-        ? { label: "OPTIONAL (nullable)", cssClass: "req-optional" }
-        : { label: "OPTIONAL", cssClass: "req-optional" };
+  if (!hasObjectSections) {
+    // Flat schema — all top-level properties are fields, not sections
+    const rootFields = analyzeObject(schema, crossGroupConds, "");
+    const [sem, leaf] = countSemantic(schema);
+    totalSemantic += sem;
+    totalLeaf += leaf;
+    totalFields += countFields(rootFields);
+    sections.push({
+      name: title,
+      nullable: false,
+      requirement: { label: "ROOT", cssClass: "req-required" },
+      fields: rootFields,
+    });
+  } else {
+    for (const [sectionName, sectionSchema] of Object.entries(properties)) {
+      const [unwrapped, nullable] = unwrapNullable(sectionSchema);
 
-    if (unwrapped["type"] === "object" && unwrapped["properties"]) {
-      const sectionFields = analyzeObject(
-        unwrapped,
-        crossGroupConds,
-        sectionName,
-      );
-      const [sem, leaf] = countSemantic(unwrapped);
-      totalSemantic += sem;
-      totalLeaf += leaf;
-      totalFields += countFields(sectionFields);
-      sections.push({
-        name: sectionName,
-        nullable,
-        requirement: sectionReq,
-        fields: sectionFields,
-      });
-    } else {
-      // Non-object top-level property (rare but possible)
-      totalFields += 1;
-      totalLeaf += 1;
-      sections.push({
-        name: sectionName,
-        nullable,
-        requirement: sectionReq,
-        fields: [
-          {
-            name: sectionName,
-            type: typeSummary(unwrapped),
-            requirement: sectionReq,
-            extensions: collectExtensions(unwrapped),
-          },
-        ],
-      });
+      // Section-level requirement
+      const isRequired = requiredSet.has(sectionName);
+      const sectionReq = isRequired
+        ? { label: "REQUIRED", cssClass: "req-required" }
+        : nullable
+          ? { label: "OPTIONAL (nullable)", cssClass: "req-optional" }
+          : { label: "OPTIONAL", cssClass: "req-optional" };
+
+      if (unwrapped["type"] === "object" && unwrapped["properties"]) {
+        const sectionFields = analyzeObject(
+          unwrapped,
+          crossGroupConds,
+          sectionName,
+        );
+        const [sem, leaf] = countSemantic(unwrapped);
+        totalSemantic += sem;
+        totalLeaf += leaf;
+        totalFields += countFields(sectionFields);
+        sections.push({
+          name: sectionName,
+          nullable,
+          requirement: sectionReq,
+          fields: sectionFields,
+        });
+      } else {
+        // Non-object top-level property (rare but possible)
+        totalFields += 1;
+        totalLeaf += 1;
+        sections.push({
+          name: sectionName,
+          nullable,
+          requirement: sectionReq,
+          fields: [
+            {
+              name: sectionName,
+              type: typeSummary(unwrapped),
+              requirement: sectionReq,
+              extensions: collectExtensions(unwrapped),
+            },
+          ],
+        });
+      }
     }
   }
 

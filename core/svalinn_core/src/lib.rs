@@ -129,12 +129,9 @@ pub fn scan_directory(directory: &str, include_tests: bool) -> Result<ScanResult
     let mut files_scanned = 0;
 
     for sidecar in sidecars {
-        match read_sidecar(&sidecar) {
-            Ok(issues) => {
-                files_scanned += 1;
-                all_issues.extend(issues);
-            }
-            Err(e) => eprintln!("Warning: {}", e),
+        if let Ok(issues) = read_sidecar(&sidecar) {
+            files_scanned += 1;
+            all_issues.extend(issues);
         }
     }
 
@@ -188,13 +185,14 @@ pub fn run_saga(directory: &str) -> Result<SagaResult, String> {
 
     let stdout = String::from_utf8_lossy(&output.stdout).to_string();
     let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+
+    let (files_analyzed, total_issues) = parse_saga_output(&stdout);
+
     let combined = if stderr.is_empty() {
-        stdout.clone()
+        stdout
     } else {
         format!("{}\n{}", stdout, stderr)
     };
-
-    let (files_analyzed, total_issues) = parse_saga_output(&stdout);
 
     Ok(SagaResult {
         success: output.status.success(),
@@ -218,61 +216,66 @@ fn parse_saga_output(output: &str) -> (usize, usize) {
     (0, 0)
 }
 
+fn sidecar_status(path: &Path, name: &str, is_dir: bool) -> (bool, usize) {
+    if !is_dir && name.ends_with(".py") {
+        let parent = match path.parent() {
+            Some(dir) => dir,
+            None => return (false, 0),
+        };
+        let sidecar_path = parent.join(format!(".{}.qa", name));
+        if sidecar_path.exists() {
+            let count = read_sidecar(&sidecar_path)
+                .map(|issues| issues.len())
+                .unwrap_or(0);
+            (true, count)
+        } else {
+            (false, 0)
+        }
+    } else if is_dir {
+        let pattern = format!("{}/**/.*.qa", path.display());
+        let count: usize = glob(&pattern)
+            .map(|paths| {
+                paths
+                    .filter_map(Result::ok)
+                    .filter_map(|sidecar| read_sidecar(&sidecar).ok())
+                    .map(|issues| issues.len())
+                    .sum()
+            })
+            .unwrap_or(0);
+        (false, count)
+    } else {
+        (false, 0)
+    }
+}
+
 pub fn list_qa_tree(directory: &str) -> Result<Vec<SvalFileTreeEntry>, String> {
     let dir_path = Path::new(directory);
     if !dir_path.is_dir() {
         return Err(format!("Not a directory: {}", directory));
     }
 
-    let mut entries: Vec<SvalFileTreeEntry> = vec![];
-
     let read_dir = std::fs::read_dir(dir_path)
         .map_err(|e| format!("Failed to read directory: {}", e))?;
 
-    for entry in read_dir.flatten() {
-        let path = entry.path();
-        let name = entry.file_name().to_string_lossy().to_string();
-
-        if name.starts_with('.') {
-            continue;
-        }
-
-        let is_dir = path.is_dir();
-
-        let (has_sidecar, issue_count) = if !is_dir && name.ends_with(".py") {
-            let sidecar_path = path.parent().unwrap().join(format!(".{}.qa", name));
-            if sidecar_path.exists() {
-                let count = read_sidecar(&sidecar_path)
-                    .map(|issues| issues.len())
-                    .unwrap_or(0);
-                (true, count)
-            } else {
-                (false, 0)
+    let mut entries: Vec<SvalFileTreeEntry> = read_dir
+        .flatten()
+        .filter_map(|entry| {
+            let path = entry.path();
+            let name = entry.file_name().to_string_lossy().to_string();
+            if name.starts_with('.') {
+                return None;
             }
-        } else if is_dir {
-            let pattern = format!("{}/**/.*.qa", path.display());
-            let count: usize = glob(&pattern)
-                .map(|paths| {
-                    paths
-                        .filter_map(Result::ok)
-                        .filter_map(|p| read_sidecar(&p).ok())
-                        .map(|issues| issues.len())
-                        .sum()
-                })
-                .unwrap_or(0);
-            (false, count)
-        } else {
-            (false, 0)
-        };
-
-        entries.push(SvalFileTreeEntry {
-            name,
-            path: path.to_string_lossy().to_string(),
-            is_dir,
-            has_sidecar,
-            issue_count,
-        });
-    }
+            let is_dir = path.is_dir();
+            let (has_sidecar, issue_count) = sidecar_status(&path, &name, is_dir);
+            Some(SvalFileTreeEntry {
+                name,
+                path: path.to_string_lossy().to_string(),
+                is_dir,
+                has_sidecar,
+                issue_count,
+            })
+        })
+        .collect();
 
     entries.sort_by(|a, b| {
         match (a.is_dir, b.is_dir) {

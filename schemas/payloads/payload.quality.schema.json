@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "payload.quality.schema.json",
+  "title": "Quality Datagram Payload",
+  "description": "Payload for kind: quality datagrams. Emitted by the syn binary. Groups issues by (tool, code) pair with file-aggregated locations.",
+  "type": "object",
+  "required": ["total", "check_types", "groups"],
+  "additionalProperties": false,
+  "properties": {
+    "total": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Sum of all issue counts across all groups."
+    },
+    "check_types": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of distinct (tool, code) pairs."
+    },
+    "groups": {
+      "type": "array",
+      "description": "One entry per unique (tool, code) combination.",
+      "items": { "$ref": "#/$defs/check_group" }
+    }
+  },
+  "$defs": {
+    "check_group": {
+      "type": "object",
+      "required": ["tool", "code", "message", "severity", "count", "file_count", "signal", "direction", "canary", "locations"],
+      "additionalProperties": false,
+      "properties": {
+        "tool": {
+          "type": "string",
+          "description": "Linter/checker tool name (e.g. \"ruff\", \"gleipnir\", \"basedpyright\")."
+        },
+        "code": {
+          "type": "string",
+          "description": "Rule code (e.g. \"E501\", \"G001\", \"F401\")."
+        },
+        "message": {
+          "type": "string",
+          "description": "Representative issue message (from the first issue in the group)."
+        },
+        "severity": {
+          "type": "string",
+          "enum": ["info", "warning", "error", "blocked"],
+          "description": "Issue severity within the quality report."
+        },
+        "count": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Total number of issues in this group."
+        },
+        "file_count": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Number of unique files containing this issue."
+        },
+        "signal": {
+          "type": "string",
+          "description": "Architectural signal — what was detected. Empty string when not applicable."
+        },
+        "direction": {
+          "type": "string",
+          "description": "Suggested fix direction. Empty string when not applicable."
+        },
+        "canary": {
+          "type": "string",
+          "description": "Context loss canary token. Empty string when not applicable."
+        },
+        "locations": {
+          "type": "array",
+          "description": "File-aggregated locations. Issues in the same file collapse into one entry.",
+          "items": { "$ref": "#/$defs/location" }
+        }
+      }
+    },
+    "location": {
+      "type": "object",
+      "required": ["file"],
+      "additionalProperties": false,
+      "description": "Single-line: { file, line }. Multi-line: { file, lines }. Exactly one of line or lines must be present.",
+      "properties": {
+        "file": {
+          "type": "string",
+          "description": "File path relative to workspace root."
+        },
+        "line": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Line number (when file has exactly one issue in this group)."
+        },
+        "lines": {
+          "type": "array",
+          "items": { "type": "integer", "minimum": 1 },
+          "minItems": 2,
+          "description": "Line numbers (when file has multiple issues in this group)."
+        }
+      },
+      "oneOf": [
+        { "required": ["line"] },
+        { "required": ["lines"] }
+      ]
+    }
+  }
+}

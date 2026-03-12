@@ -7,7 +7,11 @@
  * - Kvasir (workspace inspector)
  * - Ratatoskr (graph viewer)
  *
- * Dark theme optimized for reduced eye strain.
+ * Default theme: dark blue-purple (":root" = darkly).
+ * Themes activated via body[data-theme] attribute.
+ *
+ * Contrast targets (polarity-aware):
+ *   Dark-on-light: 14-16:1  |  Light-on-dark: 7-10:1
  */
 
 :root {
@@ -73,4 +77,162 @@
   /* ===== Shadows ===== */
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
   --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.3);
+
+  /* ===== Syntax Highlighting ===== */
+  --syntax-identifier: #7aa2f7;   /* Section names, group names */
+  --syntax-annotation: #bb9af7;   /* Nullable, format, oneOf, alt labels */
+  --syntax-keyword: #7dcfff;      /* Field types */
+  --syntax-value: #9ece6a;        /* Defaults, required, check marks */
+  --syntax-conditional: #e0af68;  /* Conditionals, caution */
+  --syntax-error: #f7768e;        /* Excludes, errors, anti-patterns */
+  --syntax-constraint: #73daca;   /* Constraints */
+
+  /* ===== Graph Visualization ===== */
+  --graph-node-app: var(--action-primary);
+  --graph-node-library: var(--severity-success);
+  --graph-node-framework: var(--severity-warning);
+  --graph-node-default: var(--text-secondary);
+  --graph-edge: var(--border-default);
+  --graph-edge-label: var(--text-secondary);
+  --graph-node-stroke: var(--text-primary);
+  --graph-node-label: var(--text-primary);
+
+  /* ===== Priority Tints ===== */
+  --priority-high-tint: rgba(255, 153, 0, 0.04);
+  --priority-critical-tint: rgba(255, 51, 51, 0.07);
+
+  /* ===== Table ===== */
+  --bg-alt-row: rgba(255, 255, 255, 0.02);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Light Theme — dark-on-light, target 14-16:1 contrast
+   From doctools: bg #ffffff, text #1f1f1f (15.12:1)
+   ═══════════════════════════════════════════════════════════════════════════ */
+body[data-theme="light"] {
+  --bg-primary: #ffffff;
+  --bg-secondary: #f5f5f5;
+  --bg-tertiary: #e8e8e8;
+  --bg-hover: #ebebeb;
+  --bg-selected: #dde4f0;
+
+  --text-primary: #1f1f1f;
+  --text-secondary: #555555;
+  --text-muted: #444444;
+
+  --border-default: #d0d0d0;
+  --border-subtle: #e8e8e8;
+
+  --severity-blocked: #cc00cc;
+  --severity-error: #cc0000;
+  --severity-warning: #b38600;
+  --severity-success: #2d8a4e;
+
+  --action-primary: #2f54eb;
+  --action-primary-hover: #1d39c4;
+  --action-special: #722ed1;
+  --action-special-hover: #531dab;
+  --action-neutral: #e0e0e0;
+  --action-neutral-hover: #d0d0d0;
+
+  --syntax-identifier: #4078f2;
+  --syntax-annotation: #a626a4;
+  --syntax-keyword: #0184bc;
+  --syntax-value: #50a14f;
+  --syntax-conditional: #c18401;
+  --syntax-error: #e45649;
+  --syntax-constraint: #0997b3;
+
+  --priority-high-tint: rgba(180, 100, 0, 0.06);
+  --priority-critical-tint: rgba(200, 0, 0, 0.08);
+  --bg-alt-row: rgba(0, 0, 0, 0.02);
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.08);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Warm Dark Theme — light-on-dark, target 7-10:1 contrast
+   From doctools: bg #1e1e1e, text #c3c3c3 (~9:1), accents warm amber/cream
+   ═══════════════════════════════════════════════════════════════════════════ */
+body[data-theme="warm-dark"] {
+  --bg-primary: #1e1e1e;
+  --bg-secondary: #252525;
+  --bg-tertiary: #333333;
+  --bg-hover: #2e2a26;
+  --bg-selected: #3d3530;
+
+  --text-primary: #c8c898;
+  --text-secondary: #8a8070;
+  --text-muted: #b0a890;
+
+  --border-default: #3a3530;
+  --border-subtle: #2e2a26;
+
+  --severity-blocked: #e86adf;
+  --severity-error: #e8695a;
+  --severity-warning: #e8a857;
+  --severity-success: #7cc47c;
+
+  --action-primary: #c4885a;
+  --action-primary-hover: #b07a50;
+  --action-special: #9b6ec0;
+  --action-special-hover: #8560a8;
+  --action-neutral: #3a3530;
+  --action-neutral-hover: #4a4540;
+
+  --syntax-identifier: #d4a06a;
+  --syntax-annotation: #c49ac0;
+  --syntax-keyword: #7aadba;
+  --syntax-value: #a8c47a;
+  --syntax-conditional: #d4a050;
+  --syntax-error: #d07070;
+  --syntax-constraint: #70b8a0;
+
+  --priority-high-tint: rgba(200, 130, 0, 0.05);
+  --priority-critical-tint: rgba(200, 60, 40, 0.08);
+  --bg-alt-row: rgba(255, 240, 220, 0.02);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Cool Dark Theme — light-on-dark, target 7-10:1 contrast
+   From doctools: bg #1b2b34, text #c0c5ce (~10:1), accents oceanic blue-gray
+   ═══════════════════════════════════════════════════════════════════════════ */
+body[data-theme="cool-dark"] {
+  --bg-primary: #1b2b34;
+  --bg-secondary: #1f2d38;
+  --bg-tertiary: #2b3d48;
+  --bg-hover: #243540;
+  --bg-selected: #2d4050;
+
+  --text-primary: #d8dee9;
+  --text-secondary: #7e8e9a;
+  --text-muted: #a8b5c0;
+
+  --border-default: #2b3d48;
+  --border-subtle: #243540;
+
+  --severity-blocked: #c594c5;
+  --severity-error: #ec5f67;
+  --severity-warning: #fac863;
+  --severity-success: #99c794;
+
+  --action-primary: #6699cc;
+  --action-primary-hover: #5588bb;
+  --action-special: #a07acc;
+  --action-special-hover: #9070b8;
+  --action-neutral: #2b3d48;
+  --action-neutral-hover: #354858;
+
+  --syntax-identifier: #6699cc;
+  --syntax-annotation: #c594c5;
+  --syntax-keyword: #5fb3b3;
+  --syntax-value: #99c794;
+  --syntax-conditional: #fac863;
+  --syntax-error: #ec5f67;
+  --syntax-constraint: #5fb3b3;
+
+  --priority-high-tint: rgba(250, 200, 99, 0.04);
+  --priority-critical-tint: rgba(236, 95, 103, 0.07);
+  --bg-alt-row: rgba(200, 220, 240, 0.02);
 }

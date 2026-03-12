@@ -2,48 +2,72 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "datagram-schema-v1",
   "title": "Hlidskjalf Datagram",
-  "description": "Event datagram for the Hlidskjalf messaging protocol.",
+  "description": "Event datagram for the Hlidskjalf messaging protocol. The envelope is self-describing: kind identifies what the datagram IS (content type), source identifies who SENT it (the emitting binary).",
   "type": "object",
-  "required": ["timestamp", "source", "type", "priority", "workspace"],
+  "required": ["timestamp", "source", "kind", "priority", "workspace"],
   "additionalProperties": false,
   "properties": {
     "timestamp": {
       "type": "number",
-      "description": "Unix epoch timestamp in seconds (float64)."
+      "description": "Unix epoch timestamp in seconds (float64). When the datagram was created, not received."
     },
     "source": {
       "type": "string",
       "pattern": "^[a-z0-9_]{1,64}$",
-      "description": "Sending component identifier."
+      "description": "The binary that emitted this datagram via datagram (e.g. \"syn\", \"bifrost\", \"lockfile_monitor\", \"send_alert\")."
     },
-    "type": {
+    "kind": {
       "type": "string",
-      "enum": ["alert", "report", "canary", "notify"],
-      "description": "Event class."
+      "enum": ["alert", "canary", "notify", "quality", "traffic"],
+      "description": "Content type — what this datagram IS. Drives rendering (which component draws it) and filtering (which chip toggles it)."
+    },
+    "classifier": {
+      "type": "string",
+      "description": "Sub-classification within the kind. Closed enum per kind, required for kinds with significant sub-types (traffic, quality). Absent for simple kinds."
     },
     "priority": {
       "type": "string",
       "enum": ["critical", "high", "normal", "low", "trace"],
-      "description": "Severity level for threshold filtering."
+      "description": "Severity level for threshold filtering and alert modality activation."
     },
     "workspace": {
       "type": "string",
       "maxLength": 128,
-      "description": "Project context. Empty string if not workspace-scoped."
+      "description": "Project/workspace name (e.g. \"yggdrasil\", \"bragi\"). Empty string if not workspace-scoped."
     },
     "detail": {
       "type": "string",
       "maxLength": 512,
-      "description": "Human-readable event summary."
+      "description": "Human-readable one-line summary. Primary text for simple kinds (alert, canary, notify). May be absent when the payload speaks for itself."
     },
     "speech": {
       "type": "string",
       "maxLength": 256,
-      "description": "Text for spoken voice alert. Omit to let receiver generate or skip."
+      "description": "Voice alert text composed for spoken delivery. Triggers TTS when priority exceeds user's speech threshold."
     },
     "payload": {
       "type": "object",
-      "description": "Type-specific structured data. Schema varies by type+source."
+      "description": "Structured data whose shape is determined by kind. quality: payload.quality.schema.json. traffic: payload.traffic.schema.json. Simple kinds (alert, canary, notify) have no payload."
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "kind": { "const": "traffic" } } },
+      "then": {
+        "required": ["classifier"],
+        "properties": {
+          "classifier": { "enum": ["startup", "conversation", "tool", "subagent", "planning"] }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "kind": { "const": "quality" } } },
+      "then": {
+        "required": ["classifier"],
+        "properties": {
+          "classifier": { "enum": ["directory", "single_file"] }
+        }
+      }
+    }
+  ]
 }

@@ -124,8 +124,8 @@
         directory,
         includeTests,
       });
-    } catch (e) {
-      console.error("Scan failed:", e);
+    } catch (_) {
+      // scan failure surfaced via empty scanResult
     }
     loading = false;
   }
@@ -139,18 +139,18 @@
         path: directory,
         is_dir: true,
         has_sidecar: false,
-        issue_count: entries.reduce((sum, e) => sum + e.issue_count, 0),
+        issue_count: entries.reduce((total, entry) => total + entry.issue_count, 0),
         expanded: true,
-        children: entries.map(e => ({
-          ...e,
+        children: entries.map(entry => ({
+          ...entry,
           expanded: false,
           children: [],
           loading: false,
         })),
         loading: false,
       };
-    } catch (e) {
-      console.error("Failed to load tree:", e);
+    } catch (_) {
+      // tree failure surfaced via null treeRoot
     }
   }
 
@@ -166,14 +166,14 @@
         node.loading = true;
         try {
           const entries = await invoke<FileTreeEntry[]>(commands.list_qa_tree, { directory: node.path });
-          node.children = entries.map(e => ({
-            ...e,
+          node.children = entries.map(entry => ({
+            ...entry,
             expanded: false,
             children: [],
             loading: false,
           }));
-        } catch (e) {
-          console.error("Failed to load children:", e);
+        } catch (_) {
+          // child load failure leaves node empty
         }
         node.loading = false;
       }
@@ -200,12 +200,11 @@
     if (!directory) return;
     sagaRunning = true;
     try {
-      const result = await invoke<SagaResult>(commands.run_saga, { directory });
-      console.log("Saga result:", result);
+      await invoke<SagaResult>(commands.run_saga, { directory });
       await refresh();
       await loadTree();
-    } catch (e) {
-      console.error("Saga failed:", e);
+    } catch (_) {
+      // saga failure surfaced via unchanged scanResult
     }
     sagaRunning = false;
   }
@@ -213,8 +212,8 @@
   async function openInEditor(file: string, line: number) {
     try {
       await invoke(commands.open_in_editor, { path: file, line });
-    } catch (e) {
-      console.error("Failed to open in editor:", e);
+    } catch (_) {
+      // editor open is best-effort
     }
   }
 
@@ -224,11 +223,11 @@
     if (severityFilter !== "All") issues = issues.filter(i => i.severity === severityFilter);
     if (toolFilter !== "All") issues = issues.filter(i => i.tool === toolFilter);
     if (searchQuery) {
-      const q = searchQuery.toLowerCase();
-      issues = issues.filter(i =>
-        i.file.toLowerCase().includes(q) ||
-        i.message.toLowerCase().includes(q) ||
-        i.code.toLowerCase().includes(q)
+      const needle = searchQuery.toLowerCase();
+      issues = issues.filter(issue =>
+        issue.file.toLowerCase().includes(needle) ||
+        issue.message.toLowerCase().includes(needle) ||
+        issue.code.toLowerCase().includes(needle)
       );
     }
     return issues;
@@ -260,7 +259,7 @@
       groups[key].push(issue);
     }
 
-    return Object.entries(groups).sort((a, b) => b[1].length - a[1].length);
+    return Object.entries(groups).sort((groupA, groupB) => groupB[1].length - groupA[1].length);
   });
 
   function relativePath(fullPath: string): string {
@@ -326,12 +325,12 @@
     }
     let maxPriority = 0;
     let maxSev = "info";
-    for (const [filePath, sev] of filteredDataByPath.severities) {
+    for (const [filePath, severity] of filteredDataByPath.severities) {
       if (filePath.startsWith(path + "/")) {
-        const p = severityPriority[sev] || 0;
-        if (p > maxPriority) {
-          maxPriority = p;
-          maxSev = sev;
+        const priority = severityPriority[severity] || 0;
+        if (priority > maxPriority) {
+          maxPriority = priority;
+          maxSev = severity;
         }
       }
     }

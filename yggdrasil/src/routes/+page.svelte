@@ -3,6 +3,7 @@
   import SvalinnView from "$svalinn/SvalinnView.svelte";
   import KvasirView from "$kvasir/KvasirView.svelte";
   import RatatoskrView from "$ratatoskr/RatatoskrView.svelte";
+  import { ThemeSwitcher } from "@yggdrasil/ui";
   import { invoke } from "@tauri-apps/api/core";
   import { listen } from "@tauri-apps/api/event";
   import { onMount } from "svelte";
@@ -76,6 +77,8 @@
           read_jsonl_info: "kvas_read_jsonl_info",
           read_jsonl_entry: "kvas_read_jsonl_entry",
           export_entry_as: "kvas_export_entry_as",
+          read_table: "kvas_read_table",
+          export_table_csv: "kvas_export_table_csv",
         }} openFile={openFilePath} />
       </div>
     {/if}
@@ -105,6 +108,9 @@
         {/each}
       </button>
     {/each}
+    <div class="theme-area">
+      <ThemeSwitcher />
+    </div>
     {#if hasDormant}
       <button
         class="tab-btn clear-btn"
@@ -197,8 +203,13 @@
     font-weight: 700;
   }
 
-  .clear-btn {
+  .theme-area {
     margin-top: auto;
+    padding: var(--space-xs) 0;
+    border-top: 1px solid var(--border-subtle);
+  }
+
+  .clear-btn {
     font-size: 0.75rem;
     color: var(--text-secondary);
   }

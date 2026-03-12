@@ -40,12 +40,22 @@ export interface JsonlEntry {
   entry_count: number;
 }
 
+export interface TableData {
+  path: string;
+  headers: string[];
+  rows: string[][];
+  row_count: number;
+  column_count: number;
+  source_format: string;
+  size_bytes: number;
+}
+
 export interface KvasTreeNode extends FileTreeEntry {
   expanded: boolean;
   children: KvasTreeNode[];
   loading: boolean;
 }
 
-export type ViewTab = "code" | "data" | "preview" | "inspect" | "jsonl";
+export type ViewTab = "code" | "data" | "preview" | "inspect" | "jsonl" | "table";
 export type DataFormat = "json" | "yaml" | "toml" | "toon" | "ron";
 export type WrapMode = "nowrap" | "wrap79" | "wrapwidth";
