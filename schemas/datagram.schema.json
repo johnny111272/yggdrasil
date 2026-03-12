@@ -18,7 +18,7 @@
     },
     "kind": {
       "type": "string",
-      "enum": ["alert", "canary", "notify", "quality", "traffic"],
+      "enum": ["alert", "warning", "canary", "notify", "quality", "traffic"],
       "description": "Content type — what this datagram IS. Drives rendering (which component draws it) and filtering (which chip toggles it)."
     },
     "classifier": {
@@ -65,7 +65,7 @@
       "then": {
         "required": ["classifier"],
         "properties": {
-          "classifier": { "enum": ["directory", "single_file"] }
+          "classifier": { "enum": ["directory", "file"] }
         }
       }
     }

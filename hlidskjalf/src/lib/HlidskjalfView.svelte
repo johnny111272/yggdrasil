@@ -60,11 +60,12 @@
 
   function kindIcon(kind: string): string {
     switch (kind) {
-      case "alert": return "\u26A0";
-      case "quality": return "\uD83D\uDCCA";
-      case "canary": return "\uD83D\uDC26";
-      case "notify": return "\u2139";
-      case "traffic": return "\uD83D\uDD04";
+      case "alert": return "\uD83D\uDED1";
+      case "warning": return "\u26A0\uFE0F";
+      case "quality": return "\u274C";
+      case "canary": return "\uD83D\uDC25";
+      case "notify": return "\u2755";
+      case "traffic": return "\uD83D\uDEA6";
       default: return "\u2753";
     }
   }
@@ -72,11 +73,12 @@
   function kindLabel(kind: string): string {
     switch (kind) {
       case "alert": return "ALERT";
+      case "warning": return "WARNING";
       case "quality": return "QUALITY";
       case "canary": return "CANARY";
       case "notify": return "NOTIFY";
       case "traffic": return "TRAFFIC";
-      default: return k.toUpperCase();
+      default: return kind.toUpperCase();
     }
   }
 
@@ -93,13 +95,15 @@
 
   let workspaceColorMap: Map<string, string> = $state(new Map());
 
+  function assignWorkspaceColor(workspace: string) {
+    if (!workspace || workspaceColorMap.has(workspace)) return;
+    const idx = workspaceColorMap.size % WORKSPACE_HUES.length;
+    workspaceColorMap = new Map([...workspaceColorMap, [workspace, WORKSPACE_HUES[idx]]]);
+  }
+
   function workspaceColor(workspace: string): string {
     if (!workspace) return "var(--text-secondary)";
-    if (!workspaceColorMap.has(workspace)) {
-      const idx = workspaceColorMap.size % WORKSPACE_HUES.length;
-      workspaceColorMap = new Map([...workspaceColorMap, [workspace, WORKSPACE_HUES[idx]]]);
-    }
-    return workspaceColorMap.get(workspace)!;
+    return workspaceColorMap.get(workspace) ?? "var(--text-secondary)";
   }
 
   // ── State ──────────────────────────────────────────────────────────
@@ -107,7 +111,7 @@
   let datagrams: Datagram[] = $state([]);
   let connected = $state(false);
   let autoScroll = $state(true);
-  let filterKind = $state("all");
+  let enabledKinds: Set<string> = $state(new Set<string>());
   let filterPriorityMin = $state(0); // trace and above (show everything)
   let speechMinPriority = $state(3); // high+ by default
   let feedElement: HTMLElement | undefined = $state();
@@ -122,34 +126,52 @@
 
   // ── Derived ────────────────────────────────────────────────────────
 
+  let allEnabled = $derived(datagramKinds.length > 0 && datagramKinds.every((kind) => enabledKinds.has(kind)));
+
+  function toggleKind(kind: string) {
+    const next = new Set(enabledKinds);
+    if (next.has(kind)) next.delete(kind);
+    else next.add(kind);
+    enabledKinds = next;
+  }
+
+  function toggleAll() {
+    enabledKinds = allEnabled ? new Set() : new Set(datagramKinds);
+  }
+
   let filteredDatagrams = $derived(
-    datagrams.filter((ev) => {
-      if (filterKind !== "all" && ev.kind !== filterKind) return false;
-      if (priorityNumeric(ev.priority) < filterPriorityMin) return false;
+    datagrams.filter((entry) => {
+      if (!enabledKinds.has(entry.kind)) return false;
+      if (priorityNumeric(entry.priority) < filterPriorityMin) return false;
       return true;
     }),
   );
 
   let datagramKinds = $derived([
-    ...new Set(datagrams.map((ev) => ev.kind)),
+    ...new Set(datagrams.map((entry) => entry.kind)),
   ]);
 
   let stats = $derived({
     total: datagrams.length,
-    critical: datagrams.filter((ev) => ev.priority === "critical").length,
-    high: datagrams.filter((ev) => ev.priority === "high").length,
+    critical: datagrams.filter((entry) => entry.priority === "critical").length,
+    high: datagrams.filter((entry) => entry.priority === "high").length,
   });
 
   // ── Lifecycle ──────────────────────────────────────────────────────
 
   onMount(async () => {
     const unlisten = await listen<Datagram>("datagram", (event) => {
-      const ev = event.payload;
+      const incoming = event.payload;
       const cutoff = Date.now() / 1000 - 3600;
-      datagrams = [...datagrams.filter(d => d.timestamp > cutoff), ev];
 
-      if (ev.speech && priorityNumeric(ev.priority) >= speechMinPriority) {
-        invoke(commands.speak, { text: ev.speech });
+      assignWorkspaceColor(incoming.workspace);
+      if (!enabledKinds.has(incoming.kind)) {
+        enabledKinds = new Set([...enabledKinds, incoming.kind]);
+      }
+      datagrams = [...datagrams.filter((prior) => prior.timestamp > cutoff), incoming];
+
+      if (incoming.speech && priorityNumeric(incoming.priority) >= speechMinPriority) {
+        invoke(commands.speak, { text: incoming.speech });
       }
 
       if (autoScroll && feedElement) {
@@ -228,19 +250,19 @@
   <div class="filters">
     <button
       class="filter-btn"
-      class:active={filterKind === "all"}
-      onclick={() => (filterKind = "all")}
+      class:active={allEnabled}
+      onclick={toggleAll}
     >
       all
     </button>
-    {#each datagramKinds as t}
+    {#each datagramKinds as kind}
       <button
         class="filter-btn"
-        class:active={filterKind === t}
-        onclick={() => (filterKind = t)}
+        class:active={enabledKinds.has(kind)}
+        onclick={() => toggleKind(kind)}
       >
-        {kindIcon(t)}
-        {t}
+        {kindIcon(kind)}
+        {kind}
       </button>
     {/each}
     <div class="filter-spacer"></div>
@@ -268,13 +290,13 @@
         <p>{connected ? "Watching for events..." : "Connecting..."}</p>
       </div>
     {:else}
-      {#each filteredDatagrams as ev}
-        {@const isExpanded = expandedRows.has(ev.timestamp)}
-        {@const hasPayload = !!ev.payload}
-        {@const isCanary = ev.kind === "canary"}
+      {#each filteredDatagrams as datagram}
+        {@const isExpanded = expandedRows.has(datagram.timestamp)}
+        {@const hasPayload = !!datagram.payload}
+        {@const isCanary = datagram.kind === "canary"}
 
         <div
-          class="event-row {priorityClass(ev.priority)}"
+          class="event-row {priorityClass(datagram.priority)}"
           class:canary={isCanary}
           class:expanded={isExpanded}
         >
@@ -282,55 +304,55 @@
             class="event-base"
             class:canary-base={isCanary}
             class:clickable={hasPayload}
-            onclick={() => { if (hasPayload) toggleRow(ev.timestamp); }}
+            onclick={() => { if (hasPayload) toggleRow(datagram.timestamp); }}
             role={hasPayload ? "button" : undefined}
             tabindex={hasPayload ? 0 : undefined}
-            onkeydown={(e) => { if (hasPayload && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); toggleRow(ev.timestamp); } }}
+            onkeydown={(keyEvent) => { if (hasPayload && (keyEvent.key === "Enter" || keyEvent.key === " ")) { keyEvent.preventDefault(); toggleRow(datagram.timestamp); } }}
           >
-            <span class="col-time">{formatTime(ev.timestamp)}</span>
-            <span class="col-kind-icon">{kindIcon(ev.kind)}</span>
+            <span class="col-time">{formatTime(datagram.timestamp)}</span>
+            <span class="col-kind-icon">{kindIcon(datagram.kind)}</span>
 
             {#if isCanary}
-              <span class="col-workspace" style="color: {workspaceColor(ev.workspace)}">{ev.workspace}</span>
+              <span class="col-workspace" style="color: {workspaceColor(datagram.workspace)}">{datagram.workspace}</span>
             {:else}
-              <span class="col-kind-label">{kindLabel(ev.kind)}</span>
-              {#if ev.classifier}
-                <span class="col-classifier">{ev.classifier}</span>
+              <span class="col-kind-label">{kindLabel(datagram.kind)}</span>
+              {#if datagram.classifier}
+                <span class="col-classifier">{datagram.classifier}</span>
               {/if}
-              <span class="col-workspace" style="color: {workspaceColor(ev.workspace)}">{ev.workspace}</span>
-              {#if ev.detail}
-                <span class="col-detail">{ev.detail}</span>
+              <span class="col-workspace" style="color: {workspaceColor(datagram.workspace)}">{datagram.workspace}</span>
+              {#if datagram.detail}
+                <span class="col-detail">{datagram.detail}</span>
               {/if}
               {#if hasPayload && !isExpanded}
                 <span class="col-expand-hint">+</span>
               {/if}
-              <span class="col-source">{ev.source}</span>
+              <span class="col-source">{datagram.source}</span>
             {/if}
           </div>
 
           {#if isExpanded && hasPayload}
             <div class="event-expanded">
               <div class="expanded-meta">
-                <span class="expanded-badge">src: {ev.source}</span>
-                <span class="expanded-badge">{ev.priority}</span>
-                {#if ev.classifier}
-                  <span class="expanded-badge">{ev.classifier}</span>
+                <span class="expanded-badge">src: {datagram.source}</span>
+                <span class="expanded-badge">{datagram.priority}</span>
+                {#if datagram.classifier}
+                  <span class="expanded-badge">{datagram.classifier}</span>
                 {/if}
               </div>
-              {#if ev.kind === "quality"}
+              {#if datagram.kind === "quality"}
                 <QualityReport
-                  payload={ev.payload}
-                  workspace={ev.workspace}
-                  timestamp={formatTime(ev.timestamp)}
+                  payload={datagram.payload}
+                  workspace={datagram.workspace}
+                  timestamp={formatTime(datagram.timestamp)}
                 />
-              {:else if ev.kind === "traffic"}
+              {:else if datagram.kind === "traffic"}
                 <TrafficReport
-                  payload={ev.payload}
-                  workspace={ev.workspace}
-                  timestamp={formatTime(ev.timestamp)}
+                  payload={datagram.payload}
+                  workspace={datagram.workspace}
+                  timestamp={formatTime(datagram.timestamp)}
                 />
               {:else}
-                <pre class="expanded-json">{JSON.stringify(ev.payload, null, 2)}</pre>
+                <pre class="expanded-json">{JSON.stringify(datagram.payload, null, 2)}</pre>
               {/if}
             </div>
           {/if}

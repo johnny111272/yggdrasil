@@ -26,6 +26,7 @@
       "type": "string",
       "enum": [
         "alert",
+        "warning",
         "canary",
         "notify",
         "quality",
@@ -115,7 +116,7 @@
           "classifier": {
             "enum": [
               "directory",
-              "single_file"
+              "file"
             ]
           },
           "payload": {

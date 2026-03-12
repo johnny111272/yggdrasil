@@ -1,11 +1,13 @@
 use serde::Deserialize;
-use std::net::{Ipv4Addr, UdpSocket};
+use socket2::{Domain, Protocol, Socket, Type};
+use std::net::Ipv4Addr;
 use std::path::PathBuf;
 
-pub use socket_emit::{Datagram, DatagramKind, Priority};
+pub use datagram::{Datagram, DatagramKind, Priority};
 
 const MULTICAST_ADDR: Ipv4Addr = Ipv4Addr::new(239, 0, 0, 1);
 const MULTICAST_PORT: u16 = 9899;
+const FALLBACK_HOME: &str = "/tmp";
 
 // ── Legacy HookEvent (backward compat) ───────────────────────────
 
@@ -32,96 +34,95 @@ fn priority_from_decision(decision: &str) -> Priority {
 }
 
 impl From<HookEvent> for Datagram {
-    fn from(ev: HookEvent) -> Self {
-        let source = ev
+    fn from(hook_event: HookEvent) -> Self {
+        let source = hook_event
             .event_name
             .split(':')
             .next()
             .unwrap_or("unknown")
             .to_string();
 
-        let kind = if ev.category == "quality" {
-            DatagramKind::Report
+        let kind = if hook_event.category == "quality" {
+            DatagramKind::Quality
         } else {
             DatagramKind::Alert
         };
 
         Datagram {
-            timestamp: ev.timestamp,
+            timestamp: hook_event.timestamp,
             source,
             kind,
-            priority: priority_from_decision(&ev.decision),
-            workspace: ev.workspace,
-            detail: Some(ev.detail),
-            speech: ev.speech,
-            payload: ev.payload,
+            classifier: None,
+            priority: priority_from_decision(&hook_event.decision),
+            workspace: hook_event.workspace,
+            detail: Some(hook_event.detail),
+            speech: hook_event.speech,
+            payload: hook_event.payload,
         }
     }
 }
 
 /// Parse a JSON line as either a Datagram or legacy HookEvent (converted to Datagram).
 fn parse_event(line: &str) -> Option<Datagram> {
-    if let Ok(dg) = serde_json::from_str::<Datagram>(line) {
-        return Some(dg);
+    if let Ok(datagram) = serde_json::from_str::<Datagram>(line) {
+        return Some(datagram);
     }
-    if let Ok(ev) = serde_json::from_str::<HookEvent>(line) {
-        return Some(ev.into());
+    if let Ok(hook_event) = serde_json::from_str::<HookEvent>(line) {
+        return Some(hook_event.into());
     }
     None
 }
 
-// ── Multicast listener ──────────────────────────────────────────
+// ── Packet processing ───────────────────────────────────────────
 
-/// Join UDP multicast group and forward parsed datagrams to the channel.
-/// Receives from socket_emit producers on 239.0.0.1:9899.
-pub async fn start_listener(
-    sender: tokio::sync::mpsc::UnboundedSender<Datagram>,
-) -> Result<(), String> {
-    // Bind + join on a std socket, then convert to tokio.
-    // Join on loopback — socket_emit sends with TTL=0 (loopback only).
-    let std_socket = UdpSocket::bind(("0.0.0.0", MULTICAST_PORT))
-        .map_err(|e| format!("Failed to bind multicast port {}: {}", MULTICAST_PORT, e))?;
-    std_socket
+/// Try to parse a UDP packet as a datagram and forward it.
+fn forward_packet(
+    data: &[u8],
+    sender: &tokio::sync::mpsc::UnboundedSender<Datagram>,
+) {
+    let line = match std::str::from_utf8(data) {
+        Ok(s) => s.trim(),
+        Err(_) => return,
+    };
+    if line.is_empty() {
+        return;
+    }
+    if let Some(datagram) = parse_event(line) {
+        let _ = sender.send(datagram);
+    }
+}
+
+/// Set up the multicast UDP socket for receiving datagrams.
+/// Uses SO_REUSEADDR + SO_REUSEPORT so multiple listeners
+/// (Hlidskjalf standalone + Yggdrasil) can bind the same port.
+fn setup_multicast_socket() -> Result<tokio::net::UdpSocket, String> {
+    let socket = Socket::new(Domain::IPV4, Type::DGRAM, Some(Protocol::UDP))
+        .map_err(|e| format!("Failed to create socket: {e}"))?;
+    socket
+        .set_reuse_address(true)
+        .map_err(|e| format!("Failed to set SO_REUSEADDR: {e}"))?;
+    socket
+        .set_reuse_port(true)
+        .map_err(|e| format!("Failed to set SO_REUSEPORT: {e}"))?;
+    let bind_addr = std::net::SocketAddrV4::new(Ipv4Addr::UNSPECIFIED, MULTICAST_PORT);
+    socket
+        .bind(&bind_addr.into())
+        .map_err(|e| format!("Failed to bind multicast port {MULTICAST_PORT}: {e}"))?;
+    socket
         .join_multicast_v4(&MULTICAST_ADDR, &Ipv4Addr::LOCALHOST)
-        .map_err(|e| format!("Failed to join multicast group: {}", e))?;
-    std_socket
+        .map_err(|e| format!("Failed to join multicast group: {e}"))?;
+    socket
         .set_nonblocking(true)
-        .map_err(|e| format!("Failed to set non-blocking: {}", e))?;
-
-    let socket = tokio::net::UdpSocket::from_std(std_socket)
-        .map_err(|e| format!("Failed to create async socket: {}", e))?;
-
-    tokio::spawn(async move {
-        let mut buf = [0u8; 65535];
-        loop {
-            match socket.recv_from(&mut buf).await {
-                Ok((len, _addr)) => {
-                    let data = &buf[..len];
-                    let line = match std::str::from_utf8(data) {
-                        Ok(s) => s.trim(),
-                        Err(_) => continue,
-                    };
-                    if line.is_empty() {
-                        continue;
-                    }
-                    if let Some(datagram) = parse_event(line) {
-                        let _ = sender.send(datagram);
-                    }
-                }
-                Err(e) => {
-                    eprintln!("Multicast recv error: {}", e);
-                }
-            }
-        }
-    });
-
-    Ok(())
+        .map_err(|e| format!("Failed to set non-blocking: {e}"))?;
+    let std_socket: std::net::UdpSocket = socket.into();
+    tokio::net::UdpSocket::from_std(std_socket)
+        .map_err(|e| format!("Failed to create async socket: {e}"))
 }
 
 // ── Lockfile system ──────────────────────────────────────────────
 
 fn hlidskjalf_dir() -> PathBuf {
-    let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".to_string());
+    let home = std::env::var("HOME").unwrap_or_else(|_| FALLBACK_HOME.into());
     PathBuf::from(home).join(".ai").join("hlidskjalf")
 }
 
@@ -143,51 +144,81 @@ pub fn init_lockfiles() {
     }
 }
 
-/// Start monitoring lockfiles. Emits critical alerts to the channel.
-/// Checks every 5 seconds for:
-///   - KILL.lock present → critical alert
-///   - KEEP_ALIVE.lock missing → critical alert
-pub async fn start_lockfile_monitor(
+/// Check lockfiles and emit critical alerts for any violations.
+fn check_lockfiles(sender: &tokio::sync::mpsc::UnboundedSender<Datagram>) {
+    if kill_path().exists() {
+        let _ = sender.send(Datagram {
+            timestamp: now(),
+            source: "lockfile_monitor".to_string(),
+            kind: DatagramKind::Alert,
+            classifier: None,
+            priority: Priority::Critical,
+            workspace: String::new(),
+            detail: Some("KILL.lock detected — kill switch activated".to_string()),
+            speech: Some("CRITICAL: Kill switch activated. Shutting down all operations.".to_string()),
+            payload: None,
+        });
+    }
+
+    if !keep_alive_path().exists() {
+        let _ = sender.send(Datagram {
+            timestamp: now(),
+            source: "lockfile_monitor".to_string(),
+            kind: DatagramKind::Alert,
+            classifier: None,
+            priority: Priority::Critical,
+            workspace: String::new(),
+            detail: Some("KEEP_ALIVE.lock missing — system integrity check failed".to_string()),
+            speech: Some("CRITICAL: Keep alive lock missing. System integrity compromised.".to_string()),
+            payload: None,
+        });
+    }
+}
+
+fn now() -> f64 {
+    datagram::now()
+}
+
+// ── Listener task ────────────────────────────────────────────────
+
+/// Spawn a task that receives UDP multicast datagrams and forwards them.
+async fn start_listener(
+    sender: tokio::sync::mpsc::UnboundedSender<Datagram>,
+) -> Result<(), String> {
+    let socket = setup_multicast_socket()?;
+
+    tokio::spawn(async move {
+        eprintln!("[hlidskjalf_core] listener task started, awaiting multicast on 239.0.0.1:9899");
+        let mut buf = [0u8; 65535];
+        let mut recv_count: u64 = 0;
+        loop {
+            match socket.recv_from(&mut buf).await {
+                Ok((len, src)) => {
+                    recv_count += 1;
+                    eprintln!("[hlidskjalf_core] recv #{recv_count}: {len} bytes from {src}");
+                    forward_packet(&buf[..len], &sender);
+                }
+                Err(e) => eprintln!("[hlidskjalf_core] multicast recv error: {e}"),
+            }
+        }
+    });
+
+    Ok(())
+}
+
+// ── Lockfile monitor task ────────────────────────────────────────
+
+/// Spawn a task that checks lockfiles every 5 seconds.
+async fn start_lockfile_monitor(
     sender: tokio::sync::mpsc::UnboundedSender<Datagram>,
 ) {
     tokio::spawn(async move {
         let mut interval = tokio::time::interval(std::time::Duration::from_secs(5));
         loop {
             interval.tick().await;
-
-            if kill_path().exists() {
-                let dg = Datagram {
-                    timestamp: now(),
-                    source: "lockfile_monitor".to_string(),
-                    kind: DatagramKind::Alert,
-                    priority: Priority::Critical,
-                    workspace: String::new(),
-                    detail: Some("KILL.lock detected — kill switch activated".to_string()),
-                    speech: Some("CRITICAL: Kill switch activated. Shutting down all operations.".to_string()),
-                    payload: None,
-                };
-                let _ = sender.send(dg);
-            }
-
-            if !keep_alive_path().exists() {
-                let dg = Datagram {
-                    timestamp: now(),
-                    source: "lockfile_monitor".to_string(),
-                    kind: DatagramKind::Alert,
-                    priority: Priority::Critical,
-                    workspace: String::new(),
-                    detail: Some("KEEP_ALIVE.lock missing — system integrity check failed".to_string()),
-                    speech: Some("CRITICAL: Keep alive lock missing. System integrity compromised.".to_string()),
-                    payload: None,
-                };
-                let _ = sender.send(dg);
-            }
+            check_lockfiles(&sender);
         }
     });
-}
-
-fn now() -> f64 {
-    socket_emit::now()
 }
 
 // ── Orchestration ────────────────────────────────────────────────
@@ -195,6 +226,10 @@ fn now() -> f64 {
 /// Initialize the full Hlidskjalf subsystem: set up lockfiles,
 /// start the multicast listener, and start the lockfile monitor.
 /// All parsed events are forwarded to the provided channel.
+///
+/// Two independent tasks share the channel via sender.clone().
+/// UnboundedSender::clone is an Arc refcount bump — this is the
+/// intended use pattern for mpsc with multiple producers.
 pub async fn start_all(
     sender: tokio::sync::mpsc::UnboundedSender<Datagram>,
 ) -> Result<(), String> {
