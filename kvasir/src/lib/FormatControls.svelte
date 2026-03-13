@@ -17,6 +17,7 @@
       yaml: { count: dataFormats.yaml.token_count, savings: baseline - dataFormats.yaml.token_count },
       toml: { count: dataFormats.toml.token_count, savings: baseline - dataFormats.toml.token_count },
       toon: { count: dataFormats.toon.token_count, savings: baseline - dataFormats.toon.token_count },
+      ron: { count: dataFormats.ron.token_count, savings: baseline - dataFormats.ron.token_count },
       source,
       baseline,
     };
