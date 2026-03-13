@@ -1194,7 +1194,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "datagram"
+name = "datagram_io"
 version = "0.1.0"
 dependencies = [
  "datagram_types",
@@ -2171,7 +2171,7 @@ dependencies = [
 name = "hlidskjalf_core"
 version = "0.1.0"
 dependencies = [
- "datagram",
+ "datagram_io",
  "serde",
  "serde_json",
  "socket2 0.5.10",

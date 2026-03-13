@@ -14,7 +14,7 @@ members = [
 ]
 
 [workspace.dependencies]
-datagram = { path = "../nornir/capability/datagram" }
+datagram_io = { path = "../nornir/capability/datagram_io" }
 format_core = { path = "../nornir/core/format_core" }
 error_core = { path = "../nornir/core/error_core" }
 serde = { version = "1", features = ["derive"] }

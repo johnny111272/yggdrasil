@@ -235,7 +235,7 @@
 
   function parsePathSegments(text: string): TextSegment[] {
     // Absolute paths (/...) or @-notation paths (@path/to/file:line or @seg:seg)
-    const pattern = /(\/[\w.\/_-]+(?::(\d+))?)|((@[\w][\w.\/_-]+?)(?::(\d+))?(?=\s|$|[,;)\]}"']|$))/g;
+    const pattern = /(\/[\w.\/_-]+(?::(\d+))?)|((@[\w][\w.\/:_-]+?)(?::(\d+))?(?=\s|$|[,;)\]}"']))/g;
     const segments: TextSegment[] = [];
     let lastIndex = 0;
     let match;
@@ -399,14 +399,14 @@
             {#if isCanary}
               <span class="col-source-inline">{datagram.source}</span>
               {#if datagram.workspace}
-                <span class="col-workspace" style="color: {workspaceColor(datagram.workspace)}">{datagram.workspace}</span>
+                <button class="col-workspace workspace-link" style="color: {workspaceColor(datagram.workspace)}" onclick={(event) => { event.stopPropagation(); handleOpenFile(resolveNotation(datagram.workspace)); }}>{datagram.workspace}</button>
               {/if}
             {:else}
               <span class="col-kind-label">{kindLabel(datagram.kind)}</span>
               {#if datagram.classifier}
                 <span class="col-classifier">{datagram.classifier}</span>
               {/if}
-              <span class="col-workspace" style="color: {workspaceColor(datagram.workspace)}">{datagram.workspace}</span>
+              <button class="col-workspace workspace-link" style="color: {workspaceColor(datagram.workspace)}" onclick={(event) => { event.stopPropagation(); handleOpenFile(resolveNotation(datagram.workspace)); }}>{datagram.workspace}</button>
               {#if datagram.detail}
                 <span class="col-detail">{#each parsePathSegments(datagram.detail) as segment}{#if segment.path}<button class="detail-path-link" onclick={(event) => { event.stopPropagation(); handleOpenFile(segment.path!, segment.line); }}>{segment.text}</button>{:else}{segment.text}{/if}{/each}</span>
               {/if}
@@ -755,6 +755,21 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+
+  .workspace-link {
+    background: none;
+    border: none;
+    font-family: inherit;
+    font-size: inherit;
+    font-weight: inherit;
+    cursor: pointer;
+    padding: 0;
+    text-align: left;
+  }
+
+  .workspace-link:hover {
+    text-decoration: underline;
   }
 
   .col-detail {

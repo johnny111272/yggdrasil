@@ -3,7 +3,7 @@ use socket2::{Domain, Protocol, Socket, Type};
 use std::net::Ipv4Addr;
 use std::path::PathBuf;
 
-pub use datagram::{Datagram, DatagramKind, Priority};
+pub use datagram_io::{Datagram, DatagramKind, Priority};
 
 const MULTICAST_ADDR: Ipv4Addr = Ipv4Addr::new(239, 0, 0, 1);
 const MULTICAST_PORT: u16 = 9899;
@@ -176,7 +176,7 @@ fn check_lockfiles(sender: &tokio::sync::mpsc::UnboundedSender<Datagram>) {
 }
 
 fn now() -> f64 {
-    datagram::now()
+    datagram_io::now()
 }
 
 // ── Listener task ────────────────────────────────────────────────
