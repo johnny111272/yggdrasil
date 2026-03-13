@@ -227,8 +227,15 @@
     line?: number;
   }
 
+  function resolveNotation(notation: string): string {
+    // @path/to/file or @seg:seg — both resolve under ~/.ai/
+    const relative = notation.slice(1).replace(/:/g, "/");
+    return `/Users/johnny/.ai/${relative}`;
+  }
+
   function parsePathSegments(text: string): TextSegment[] {
-    const pattern = /(\/[\w./_-]+(?::(\d+))?)/g;
+    // Absolute paths (/...) or @-notation paths (@path/to/file:line or @seg:seg)
+    const pattern = /(\/[\w.\/_-]+(?::(\d+))?)|((@[\w][\w.\/_-]+?)(?::(\d+))?(?=\s|$|[,;)\]}"']|$))/g;
     const segments: TextSegment[] = [];
     let lastIndex = 0;
     let match;
@@ -237,10 +244,21 @@
       if (match.index > lastIndex) {
         segments.push({ text: text.slice(lastIndex, match.index) });
       }
-      const fullMatch = match[0];
-      const lineNum = match[2] ? parseInt(match[2]) : undefined;
-      const filePath = lineNum ? fullMatch.replace(`:${match[2]}`, "") : fullMatch;
-      segments.push({ text: fullMatch, path: filePath, line: lineNum });
+
+      if (match[1]) {
+        // Absolute path, possibly with :line
+        const fullMatch = match[1];
+        const lineNum = match[2] ? parseInt(match[2]) : undefined;
+        const filePath = lineNum ? fullMatch.replace(`:${match[2]}`, "") : fullMatch;
+        segments.push({ text: fullMatch, path: filePath, line: lineNum });
+      } else if (match[4]) {
+        // @-notation path → resolve to absolute path
+        const notation = match[4];
+        const lineNum = match[5] ? parseInt(match[5]) : undefined;
+        const displayText = match[3]; // includes :line if present
+        segments.push({ text: displayText, path: resolveNotation(notation), line: lineNum });
+      }
+
       lastIndex = pattern.lastIndex;
     }
 
