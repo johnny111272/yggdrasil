@@ -13,6 +13,7 @@ tauri-build = { workspace = true }
 
 [dependencies]
 hlidskjalf_core = { path = "../../core/hlidskjalf_core" }
+common_core = { path = "../../core/common_core" }
 tauri = { workspace = true }
 tauri-plugin-opener = { workspace = true }
 tokio = { workspace = true }

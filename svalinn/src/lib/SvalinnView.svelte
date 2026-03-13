@@ -99,7 +99,7 @@
   onMount(async () => {
     if (!directory) {
       const home = await homeDir();
-      directory = home + ".ai";
+      directory = home.replace(/\/?$/, "/.ai");
       await loadTree();
     }
   });

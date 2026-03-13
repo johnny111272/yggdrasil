@@ -59,7 +59,7 @@ Each standalone app registers commands with bare names. Yggdrasil prefixes them:
 `DatagramKind` and `Priority` are Rust enums in nornir's `datagram` crate, re-exported by `hlidskjalf_core`. Wire format uses lowercase strings via `#[serde(rename_all = "lowercase")]`.
 
 **What to look for:**
-- String comparisons for datagram type or priority instead of enum matching
+- String comparisons for datagram kind or priority instead of enum matching
 - `HookEvent` usage in new code (legacy, deprecated)
 - Tauri event name `"hook-event"` instead of `"datagram"`
 - Missing variants in `DatagramKind` or `Priority` enums that exist in `schemas/datagram.schema.json`

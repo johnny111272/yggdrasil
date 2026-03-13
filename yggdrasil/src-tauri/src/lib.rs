@@ -25,6 +25,11 @@ fn hlid_speak(text: String) {
     hlidskjalf_core::speak(&text);
 }
 
+#[tauri::command]
+fn hlid_open_in_editor(path: String, line: usize) -> Result<(), String> {
+    common_core::open_in_editor(&path, line)
+}
+
 // ============================================================================
 // Svalinn commands (sval_ prefix)
 // ============================================================================
@@ -152,6 +157,7 @@ pub fn run() {
             // Hlidskjalf
             hlid_start_monitor,
             hlid_speak,
+            hlid_open_in_editor,
             // Svalinn
             sval_scan_directory,
             sval_open_in_editor,

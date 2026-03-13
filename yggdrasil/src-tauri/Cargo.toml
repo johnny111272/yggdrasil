@@ -13,6 +13,7 @@ tauri-build = { workspace = true }
 
 [dependencies]
 hlidskjalf_core = { path = "../../core/hlidskjalf_core" }
+common_core = { path = "../../core/common_core" }
 svalinn_core = { path = "../../core/svalinn_core" }
 kvasir_core = { path = "../../core/kvasir_core" }
 ratatoskr_core = { path = "../../core/ratatoskr_core" }

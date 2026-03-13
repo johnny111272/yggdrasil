@@ -5,7 +5,7 @@
   "identifier": "com.johnny.hlidskjalf",
   "build": {
     "beforeDevCommand": "npm run dev",
-    "devUrl": "http://localhost:1421",
+    "devUrl": "http://localhost:1430",
     "beforeBuildCommand": "npm run build",
     "frontendDist": "../build"
   },
@@ -13,9 +13,9 @@
     "windows": [
       {
         "title": "Hlidskjalf",
-        "width": 1200,
-        "height": 800,
-        "maximized": true
+        "width": 900,
+        "height": 600,
+        "maximized": false
       }
     ],
     "security": {

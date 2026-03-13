@@ -29,6 +29,7 @@
       export_table_csv: "export_table_csv",
     },
     openFile = null,
+    openLine = null,
   }: {
     commands?: {
       list_directory: string;
@@ -43,6 +44,7 @@
       export_table_csv: string;
     };
     openFile?: string | null;
+    openLine?: number | null;
   } = $props();
 
   // ── State ──────────────────────────────────────────────────────────────
@@ -111,7 +113,7 @@
   onMount(async () => {
     if (!openFile && !directory) {
       const home = await homeDir();
-      directory = home + ".ai";
+      directory = home.replace(/\/?$/, "/.ai");
       await loadTree();
     }
   });
@@ -267,7 +269,14 @@
         directory = dir;
         loadTree();
       }
-      loadFile(openFile);
+      loadFile(openFile).then(() => {
+        if (openLine) {
+          requestAnimationFrame(() => {
+            const lineEl = document.querySelector(`[data-line="${openLine}"]`);
+            if (lineEl) lineEl.scrollIntoView({ block: "center" });
+          });
+        }
+      });
     }
   });
 
@@ -566,7 +575,7 @@
         <MarkdownPreview content={renderedMarkdown} />
       {:else}
         <section class="code-viewer" class:wrap79={wrapMode === "wrap79"} class:wrapwidth={wrapMode === "wrapwidth"}>
-          <pre><code>{#each displayContent.split('\n') as line, i}{@const highlighted = highlightedContent.split('\n')[i] || ''}<span class="line-number">{i + 1}</span><span class="line-content">{@html highlighted}</span>
+          <pre><code>{#each displayContent.split('\n') as line, i}{@const highlighted = highlightedContent.split('\n')[i] || ''}<span class="line-number" data-line={i + 1}>{i + 1}</span><span class="line-content">{@html highlighted}</span>
 {/each}</code></pre>
         </section>
       {/if}

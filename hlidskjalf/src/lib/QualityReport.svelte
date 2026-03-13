@@ -42,9 +42,25 @@
     payload: QualityPayload;
     workspace: string;
     timestamp: string;
+    onOpenFile?: (path: string, line?: number) => void;
   }
 
-  let { payload, workspace, timestamp }: Props = $props();
+  let { payload, workspace, timestamp, onOpenFile }: Props = $props();
+
+  // ── Path resolution ────────────────────────────────────────────────
+
+  function workspaceDir(workspace_id: string): string {
+    if (!workspace_id || !workspace_id.startsWith("@")) return "";
+    const home = "/Users/johnny/.ai";
+    const relative = workspace_id.slice(1).replace(/:/g, "/");
+    return relative ? `${home}/${relative}` : home;
+  }
+
+  function resolvePath(file: string): string {
+    if (file.startsWith("/")) return file;
+    const base = workspaceDir(workspace);
+    return base ? `${base}/${file}` : file;
+  }
 
   // ── Helpers ────────────────────────────────────────────────────────
 
@@ -118,9 +134,28 @@
       <!-- Locations -->
       <div class="group-locations">
         {#each group.locations as loc}
-          {#each format_location(loc) as entry}
-            <div class="location">{entry}</div>
-          {/each}
+          {#if loc.line !== undefined}
+            <button
+              class="location-link"
+              onclick={() => onOpenFile?.(resolvePath(loc.file), loc.line)}
+              disabled={!onOpenFile}
+            >{loc.file}:{loc.line}</button>
+          {:else if loc.lines}
+            <div class="location-group">
+              <button
+                class="location-link"
+                onclick={() => onOpenFile?.(resolvePath(loc.file), loc.lines?.[0])}
+                disabled={!onOpenFile}
+              >{loc.file}</button>
+              <span class="location-lines">[{loc.lines.join(",")}]</span>
+            </div>
+          {:else}
+            <button
+              class="location-link"
+              onclick={() => onOpenFile?.(resolvePath(loc.file))}
+              disabled={!onOpenFile}
+            >{loc.file}</button>
+          {/if}
         {/each}
       </div>
     </div>
@@ -282,13 +317,35 @@
     border-top: 1px solid var(--bg-tertiary);
   }
 
-  .location {
-    color: var(--text-secondary);
+  .location-link {
+    display: block;
+    background: none;
+    border: none;
+    font-family: var(--font-mono);
     font-size: var(--text-xs);
+    color: var(--text-secondary);
     padding: 1px 0;
+    cursor: pointer;
+    text-align: left;
   }
 
-  .location:hover {
-    color: var(--text-primary);
+  .location-link:hover:not(:disabled) {
+    color: var(--action-primary);
+    text-decoration: underline;
+  }
+
+  .location-link:disabled {
+    cursor: default;
+  }
+
+  .location-group {
+    display: flex;
+    gap: var(--space-sm);
+    align-items: baseline;
+  }
+
+  .location-lines {
+    font-size: var(--text-xs);
+    color: var(--text-muted);
   }
 </style>

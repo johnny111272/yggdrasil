@@ -7,4 +7,5 @@ edition = "2021"
 datagram = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+socket2 = { workspace = true }
 tokio = { workspace = true }

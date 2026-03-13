@@ -11,6 +11,7 @@
   let activeTab = $state("hlidskjalf");
   let mounted = $state(new Set(["hlidskjalf"]));
   let openFilePath: string | null = $state(null);
+  let openFileLine: number | null = $state(null);
 
   function selectTab(id: string) {
     mounted = new Set([...mounted, id]);
@@ -21,6 +22,7 @@
     mounted = new Set(["hlidskjalf"]);
     activeTab = "hlidskjalf";
     openFilePath = null;
+    openFileLine = null;
   }
 
   const tabs = [
@@ -54,6 +56,11 @@
       <HlidskjalfView commands={{
         start_monitor: "hlid_start_monitor",
         speak: "hlid_speak",
+        open_in_editor: "hlid_open_in_editor",
+      }} onOpenFile={(path, line) => {
+        openFilePath = path;
+        openFileLine = line ?? null;
+        selectTab("kvasir");
       }} />
     </div>
     {#if mounted.has("svalinn")}
@@ -79,7 +86,7 @@
           export_entry_as: "kvas_export_entry_as",
           read_table: "kvas_read_table",
           export_table_csv: "kvas_export_table_csv",
-        }} openFile={openFilePath} />
+        }} openFile={openFilePath} openLine={openFileLine} />
       </div>
     {/if}
     {#if mounted.has("ratatoskr")}

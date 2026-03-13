@@ -1,6 +1,7 @@
 # Terminology Audit
 
 **Date:** 2026-03-11
+**Updated:** 2026-03-12 — findings 1-10 resolved; only historical audit refs (11-12) remain as-is.
 **Scope:** Stale naming, incorrect terminology, and inconsistencies following the datagram protocol renames.
 
 ---

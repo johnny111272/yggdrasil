@@ -17,11 +17,16 @@ fn speak(text: String) {
     hlidskjalf_core::speak(&text);
 }
 
+#[tauri::command]
+fn open_in_editor(path: String, line: usize) -> Result<(), String> {
+    common_core::open_in_editor(&path, line)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![start_monitor, speak])
+        .invoke_handler(tauri::generate_handler![start_monitor, speak, open_in_editor])
         .run(tauri::generate_context!())
         .unwrap_or_else(|_| std::process::exit(1));
 }

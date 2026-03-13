@@ -5,7 +5,7 @@
   "identifier": "com.johnny.yggdrasil",
   "build": {
     "beforeDevCommand": "npm run dev",
-    "devUrl": "http://localhost:1425",
+    "devUrl": "http://localhost:1460",
     "beforeBuildCommand": "npm run build",
     "frontendDist": "../build"
   },
@@ -13,9 +13,9 @@
     "windows": [
       {
         "title": "Yggdrasil",
-        "width": 1400,
-        "height": 900,
-        "maximized": true
+        "width": 1000,
+        "height": 700,
+        "maximized": false
       }
     ],
     "security": {

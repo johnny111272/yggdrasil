@@ -11,10 +11,21 @@
     commands = {
       start_monitor: "start_monitor",
       speak: "speak",
+      open_in_editor: "open_in_editor",
     },
+    onOpenFile,
   }: {
-    commands?: { start_monitor: string; speak: string };
+    commands?: { start_monitor: string; speak: string; open_in_editor: string };
+    onOpenFile?: (path: string, line?: number) => void;
   } = $props();
+
+  function handleOpenFile(path: string, line?: number) {
+    if (onOpenFile) {
+      onOpenFile(path, line);
+    } else {
+      invoke(commands.open_in_editor, { path, line: line ?? 1 });
+    }
+  }
 
   // ── Types ──────────────────────────────────────────────────────────
 
@@ -65,7 +76,7 @@
       case "quality": return "\u274C";
       case "canary": return "\uD83D\uDC25";
       case "notify": return "\u2755";
-      case "traffic": return "\uD83D\uDEA6";
+      case "traffic": return "\uD83D\uDCE6";
       default: return "\u2753";
     }
   }
@@ -116,12 +127,23 @@
   let speechMinPriority = $state(3); // high+ by default
   let feedElement: HTMLElement | undefined = $state();
   let expandedRows: Set<number> = $state(new Set());
+  let autoExpand = $state(false);
 
   function toggleRow(timestamp: number) {
     const next = new Set(expandedRows);
     if (next.has(timestamp)) next.delete(timestamp);
     else next.add(timestamp);
     expandedRows = next;
+  }
+
+  function toggleExpandAll() {
+    autoExpand = !autoExpand;
+    if (autoExpand) {
+      const withPayload = datagrams.filter((entry) => entry.payload).map((entry) => entry.timestamp);
+      expandedRows = new Set(withPayload);
+    } else {
+      expandedRows = new Set();
+    }
   }
 
   // ── Derived ────────────────────────────────────────────────────────
@@ -170,6 +192,10 @@
       }
       datagrams = [...datagrams.filter((prior) => prior.timestamp > cutoff), incoming];
 
+      if (autoExpand && incoming.payload) {
+        expandedRows = new Set([...expandedRows, incoming.timestamp]);
+      }
+
       if (incoming.speech && priorityNumeric(incoming.priority) >= speechMinPriority) {
         invoke(commands.speak, { text: incoming.speech });
       }
@@ -192,6 +218,38 @@
       unlisten();
     };
   });
+
+  // ── Path detection ────────────────────────────────────────────────
+
+  interface TextSegment {
+    text: string;
+    path?: string;
+    line?: number;
+  }
+
+  function parsePathSegments(text: string): TextSegment[] {
+    const pattern = /(\/[\w./_-]+(?::(\d+))?)/g;
+    const segments: TextSegment[] = [];
+    let lastIndex = 0;
+    let match;
+
+    while ((match = pattern.exec(text)) !== null) {
+      if (match.index > lastIndex) {
+        segments.push({ text: text.slice(lastIndex, match.index) });
+      }
+      const fullMatch = match[0];
+      const lineNum = match[2] ? parseInt(match[2]) : undefined;
+      const filePath = lineNum ? fullMatch.replace(`:${match[2]}`, "") : fullMatch;
+      segments.push({ text: fullMatch, path: filePath, line: lineNum });
+      lastIndex = pattern.lastIndex;
+    }
+
+    if (lastIndex < text.length) {
+      segments.push({ text: text.slice(lastIndex) });
+    }
+
+    return segments.length ? segments : [{ text }];
+  }
 
   // ── Helpers ────────────────────────────────────────────────────────
 
@@ -266,6 +324,14 @@
       </button>
     {/each}
     <div class="filter-spacer"></div>
+    <button
+      class="filter-btn"
+      class:active={autoExpand}
+      onclick={toggleExpandAll}
+      title={autoExpand ? "Collapse all" : "Expand all"}
+    >
+      {autoExpand ? "\u25BC" : "\u25B6"} expand
+    </button>
     <label class="auto-scroll-toggle">
       <input type="checkbox" bind:checked={autoScroll} />
       auto-scroll
@@ -313,7 +379,10 @@
             <span class="col-kind-icon">{kindIcon(datagram.kind)}</span>
 
             {#if isCanary}
-              <span class="col-workspace" style="color: {workspaceColor(datagram.workspace)}">{datagram.workspace}</span>
+              <span class="col-source-inline">{datagram.source}</span>
+              {#if datagram.workspace}
+                <span class="col-workspace" style="color: {workspaceColor(datagram.workspace)}">{datagram.workspace}</span>
+              {/if}
             {:else}
               <span class="col-kind-label">{kindLabel(datagram.kind)}</span>
               {#if datagram.classifier}
@@ -321,7 +390,7 @@
               {/if}
               <span class="col-workspace" style="color: {workspaceColor(datagram.workspace)}">{datagram.workspace}</span>
               {#if datagram.detail}
-                <span class="col-detail">{datagram.detail}</span>
+                <span class="col-detail">{#each parsePathSegments(datagram.detail) as segment}{#if segment.path}<button class="detail-path-link" onclick={(event) => { event.stopPropagation(); handleOpenFile(segment.path!, segment.line); }}>{segment.text}</button>{:else}{segment.text}{/if}{/each}</span>
               {/if}
               {#if hasPayload && !isExpanded}
                 <span class="col-expand-hint">+</span>
@@ -344,6 +413,7 @@
                   payload={datagram.payload}
                   workspace={datagram.workspace}
                   timestamp={formatTime(datagram.timestamp)}
+                  onOpenFile={handleOpenFile}
                 />
               {:else if datagram.kind === "traffic"}
                 <TrafficReport
@@ -678,6 +748,20 @@
     min-width: 0;
   }
 
+  .detail-path-link {
+    background: none;
+    border: none;
+    font-family: inherit;
+    font-size: inherit;
+    color: var(--action-primary);
+    cursor: pointer;
+    padding: 0;
+  }
+
+  .detail-path-link:hover {
+    text-decoration: underline;
+  }
+
   .col-expand-hint {
     font-size: var(--text-xs);
     color: var(--text-muted);
@@ -688,6 +772,11 @@
 
   .event-row:hover .col-expand-hint {
     opacity: 1;
+  }
+
+  .col-source-inline {
+    font-size: var(--text-xs);
+    color: var(--text-muted);
   }
 
   /* ── Source (hover pill) ──────────────────────────────────────── */

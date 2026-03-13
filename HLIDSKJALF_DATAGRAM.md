@@ -97,7 +97,7 @@ Current `WatchtowerEvent` fields map to the new format:
 |---------|-----|
 | `category` | Moves into `payload` or `detail` depending on context |
 | `decision` | Moves into `payload` (hook-specific) |
-| `event_name` | Replaced by `source` + type-specific payload |
+| `event_name` | Replaced by `source` + kind-specific payload |
 | `context_injected` | Moves into `payload` (hook-specific) |
 | `speech` | Stays as `speech` |
 
@@ -149,7 +149,7 @@ Two lockfiles, both conditions must be satisfied:
 
 Hlidskjalf UI provides toggles for:
 - Source (show/hide per component)
-- Type (show/hide per event class)
+- Kind (show/hide per event class)
 - Priority threshold (show events at or above selected level)
 - Workspace (filter by project)
 
@@ -159,8 +159,8 @@ Filters affect visibility only — all events remain in the log.
 
 Speech threshold is a priority level. Events at or above the threshold with either:
 - An explicit `speech` field — spoken directly
-- A known type with a format handler — speech generated from payload
-- An unknown type above threshold — generic template: "{source} {type} in {workspace}"
+- A known kind with a format handler — speech generated from payload
+- An unknown kind above threshold — generic template: "{source} {kind} in {workspace}"
 
 ### Canary Display
 
@@ -185,7 +185,7 @@ Separate compiled binaries per severity level, deployed to `~/.ai/tools/bin/`. N
 
 ### Fixed-severity senders
 
-| Binary | Type | Priority | Args |
+| Binary | Kind | Priority | Args |
 |--------|------|----------|------|
 | **`send_heartbeat`** | canary | low | `<source>` |
 | **`send_notification`** | notify | normal | `<source> <message>` |
