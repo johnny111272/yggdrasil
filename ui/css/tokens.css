@@ -14,6 +14,11 @@
  *   Dark-on-light: 14-16:1  |  Light-on-dark: 7-10:1
  */
 
+html, body {
+  height: 100%;
+  margin: 0;
+}
+
 :root {
   /* ===== Background Colors ===== */
   --bg-primary: #1a1a2e;        /* Body background */

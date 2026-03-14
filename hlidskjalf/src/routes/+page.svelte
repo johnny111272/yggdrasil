@@ -1,9 +1,9 @@
 <script lang="ts">
   import HlidskjalfView from "$lib/HlidskjalfView.svelte";
-  import { openPath } from "@tauri-apps/plugin-opener";
+  import { invoke } from "@tauri-apps/api/core";
 
-  function openFile(path: string, _line?: number) {
-    openPath(path);
+  function openFile(path: string, line?: number) {
+    invoke("open_default", { path });
   }
 </script>
 

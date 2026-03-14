@@ -805,7 +805,7 @@
   .inspector-view {
     background: var(--bg-secondary);
     border-radius: var(--radius-md);
-    overflow: hidden;
+    overflow: auto;
   }
 
   .empty-state {

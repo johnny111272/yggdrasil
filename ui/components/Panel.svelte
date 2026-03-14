@@ -24,7 +24,7 @@
   .panel {
     background: var(--bg-secondary);
     border-radius: var(--radius-md);
-    overflow: hidden;
+    overflow: auto;
   }
 
   .panel-header {

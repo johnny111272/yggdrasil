@@ -49,17 +49,10 @@
 
   // ── Path resolution ────────────────────────────────────────────────
 
-  function workspaceDir(workspace_id: string): string {
-    if (!workspace_id || !workspace_id.startsWith("@")) return "";
-    const home = "/Users/johnny/.ai";
-    const relative = workspace_id.slice(1).replace(/:/g, "/");
-    return relative ? `${home}/${relative}` : home;
-  }
-
   function resolvePath(file: string): string {
     if (file.startsWith("/")) return file;
-    const base = workspaceDir(workspace);
-    return base ? `${base}/${file}` : file;
+    if (file.startsWith("@")) return `/Users/johnny/.ai/${file.slice(1)}`;
+    return `/Users/johnny/.ai/${file}`;
   }
 
   // ── Helpers ────────────────────────────────────────────────────────

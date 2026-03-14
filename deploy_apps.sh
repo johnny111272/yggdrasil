@@ -20,7 +20,7 @@ for app in "${APPS[@]}"; do
     npx tauri build 2>&1 | tail -3
 done
 
-# Move to /Applications (remove old first)
+# Kill running apps, then move to /Applications
 for app in "${APPS[@]}"; do
     src="$BUNDLE_DIR/$app.app"
     dst="$DEST/$app.app"
@@ -29,6 +29,18 @@ for app in "${APPS[@]}"; do
         echo "!! $src not found, skipping"
         continue
     fi
+
+    # Kill running process before overwriting
+    if pgrep -x "$app" >/dev/null 2>&1; then
+        echo "==> Killing running $app"
+        pkill -x "$app" || true
+        sleep 0.5
+    fi
+
+    # Clear WebKit caches (WKWebView serves stale frontend otherwise)
+    identifier="com.johnny.$app"
+    rm -rf ~/Library/WebKit/"$app" ~/Library/WebKit/"$identifier"
+    rm -rf ~/Library/Caches/"$app" ~/Library/Caches/"$identifier"
 
     # Remove old (symlink or directory)
     if [ -e "$dst" ] || [ -L "$dst" ]; then
