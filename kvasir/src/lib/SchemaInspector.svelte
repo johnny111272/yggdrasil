@@ -404,10 +404,10 @@
   }
   .desc-text { color: var(--text-secondary); }
 
-  .req-required { color: var(--syntax-value); }
-  .req-optional { color: var(--text-secondary); }
+  .req-required { color: var(--severity-error); }
+  .req-optional { color: var(--severity-success); }
   .req-oneof { color: var(--syntax-annotation); }
-  .req-conditional { color: var(--syntax-conditional); }
+  .req-conditional { color: var(--severity-warning); }
 
   .ext {
     font-size: 0.78rem;
