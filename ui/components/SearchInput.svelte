@@ -19,10 +19,6 @@
 </div>
 
 <style>
-  .search-wrapper {
-    margin-bottom: var(--space-xl);
-  }
-
   .search-input {
     width: 100%;
     padding: var(--space-lg) var(--space-xl);

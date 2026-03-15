@@ -14,11 +14,6 @@
  *   Dark-on-light: 14-16:1  |  Light-on-dark: 7-10:1
  */
 
-html, body {
-  height: 100%;
-  margin: 0;
-}
-
 :root {
   /* ===== Background Colors ===== */
   --bg-primary: #1a1a2e;        /* Body background */
@@ -51,6 +46,7 @@ html, body {
   --action-neutral-hover: #444;       /* Neutral hover */
 
   /* ===== Spacing Scale ===== */
+  --space-2xs: 0.125rem;        /* 2px — micro gaps, pill padding */
   --space-xs: 0.25rem;          /* 4px */
   --space-sm: 0.35rem;          /* ~6px */
   --space-md: 0.5rem;           /* 8px */
@@ -58,6 +54,7 @@ html, body {
   --space-xl: 1rem;             /* 16px */
   --space-2xl: 1.5rem;          /* 24px */
   --space-3xl: 2rem;            /* 32px */
+  --space-4xl: 3rem;            /* 48px — empty state padding */
 
   /* ===== Border Radius ===== */
   --radius-sm: 4px;             /* Inputs, buttons */
@@ -68,6 +65,7 @@ html, body {
   --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
 
+  --text-2xs: 0.625rem;         /* 10px — pips, tiny indicators */
   --text-xs: 0.75rem;           /* 12px - badges */
   --text-sm: 0.875rem;          /* 14px - body text */
   --text-base: 1rem;            /* 16px - default */
@@ -76,8 +74,37 @@ html, body {
   --text-2xl: 2rem;             /* 32px - stat values */
   --text-3xl: 2.5rem;           /* 40px - headings */
 
+  /* ===== Font Weight ===== */
+  --fw-light: 300;
+  --fw-normal: 400;
+  --fw-medium: 500;
+  --fw-semibold: 600;
+  --fw-bold: 700;
+  --fw-extrabold: 800;
+
+  /* ===== Line Height ===== */
+  --lh-tight: 1.2;
+  --lh-normal: 1.5;
+  --lh-relaxed: 1.6;
+  --lh-loose: 1.7;
+
   /* ===== Layout ===== */
   --sidebar-width: 280px;
+
+  /* ===== Z-Index ===== */
+  --z-base: 0;
+  --z-sticky: 10;
+  --z-sidebar: 100;
+  --z-resize: 101;
+  --z-overlay: 200;
+
+  /* ===== Transitions ===== */
+  --transition-fast: 0.1s ease;
+  --transition-normal: 0.15s ease;
+
+  /* ===== Container Font Scales ===== */
+  --ui-font-size: 14px;
+  --content-font-size: 14px;
 
   /* ===== Shadows ===== */
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
@@ -105,6 +132,14 @@ html, body {
   /* ===== Priority Tints ===== */
   --priority-high-tint: rgba(255, 153, 0, 0.04);
   --priority-critical-tint: rgba(255, 51, 51, 0.07);
+
+  /* ===== Workspace Colors ===== */
+  --ws-color-1: hsl(210, 70%, 55%);    /* Blue */
+  --ws-color-2: hsl(150, 60%, 50%);    /* Green */
+  --ws-color-3: hsl(30, 80%, 55%);     /* Orange */
+  --ws-color-4: hsl(280, 60%, 60%);    /* Purple */
+  --ws-color-5: hsl(0, 65%, 55%);      /* Red */
+  --ws-color-6: hsl(180, 55%, 50%);    /* Teal */
 
   /* ===== Table ===== */
   --bg-alt-row: rgba(255, 255, 255, 0.02);
@@ -154,6 +189,13 @@ body[data-theme="light"] {
 
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.08);
   --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
+
+  --ws-color-1: hsl(210, 70%, 40%);
+  --ws-color-2: hsl(150, 60%, 35%);
+  --ws-color-3: hsl(30, 80%, 40%);
+  --ws-color-4: hsl(280, 60%, 42%);
+  --ws-color-5: hsl(0, 65%, 40%);
+  --ws-color-6: hsl(180, 55%, 35%);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -197,6 +239,13 @@ body[data-theme="warm-dark"] {
   --priority-high-tint: rgba(200, 130, 0, 0.05);
   --priority-critical-tint: rgba(200, 60, 40, 0.08);
   --bg-alt-row: rgba(255, 240, 220, 0.02);
+
+  --ws-color-1: hsl(210, 50%, 55%);
+  --ws-color-2: hsl(150, 45%, 50%);
+  --ws-color-3: hsl(30, 65%, 55%);
+  --ws-color-4: hsl(280, 45%, 58%);
+  --ws-color-5: hsl(0, 50%, 55%);
+  --ws-color-6: hsl(180, 40%, 50%);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -240,4 +289,11 @@ body[data-theme="cool-dark"] {
   --priority-high-tint: rgba(250, 200, 99, 0.04);
   --priority-critical-tint: rgba(236, 95, 103, 0.07);
   --bg-alt-row: rgba(200, 220, 240, 0.02);
+
+  --ws-color-1: hsl(210, 55%, 55%);
+  --ws-color-2: hsl(150, 50%, 50%);
+  --ws-color-3: hsl(30, 60%, 55%);
+  --ws-color-4: hsl(280, 50%, 58%);
+  --ws-color-5: hsl(0, 55%, 55%);
+  --ws-color-6: hsl(180, 45%, 50%);
 }

@@ -3,7 +3,7 @@
   import { homeDir } from "@tauri-apps/api/path";
   import { open } from "@tauri-apps/plugin-dialog";
   import { onMount } from "svelte";
-  import { Button, SidebarLayout, TreeNode } from "@yggdrasil/ui";
+  import { Button, SidebarLayout, TreeNode, AppHeader, ErrorBanner, EmptyState, Breadcrumbs, FontControls, Input } from "@yggdrasil/ui";
   import hljs from "highlight.js";
   import "highlight.js/styles/github-dark.css";
   import { marked } from "marked";
@@ -13,7 +13,7 @@
   import TableViewer from "./TableViewer.svelte";
   import FormatControls from "./FormatControls.svelte";
   import { analyzeSchema, type InspectedSchema } from "./schema-inspect";
-  import type { FileTreeEntry, FileContent, AllFormats, KvasTreeNode, ViewTab, DataFormat, WrapMode } from "./kvasir-types";
+  import type { FileTreeEntry, FileContent, AllFormats, KvasTreeNode, ViewTab, DataFormat, WrapMode, FontFamily } from "./kvasir-types";
 
   let {
     commands = {
@@ -67,6 +67,8 @@
   let inspectedSchema: InspectedSchema | null = $state(null);
   let showHidden = $state(false);
   let wrapMode: WrapMode = $state("nowrap");
+  let viewerFontSize = $state(14);
+  let viewerFontFamily: FontFamily = $state("mono");
   let refreshKey = $state(0);
   let fileView = $state(false);
 
@@ -87,6 +89,24 @@
     if (wrapMode === "wrap79") return "wrap 79";
     return "wrap fit";
   }
+
+  const FONT_FAMILIES: FontFamily[] = ["mono", "dyslexie", "sans", "serif"];
+  const FONT_CSS: Record<FontFamily, string> = {
+    mono: "ui-monospace, SFMono-Regular, 'SF Mono', Menlo, monospace",
+    dyslexie: "'Dyslexie', sans-serif",
+    sans: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+    serif: "Georgia, 'Times New Roman', serif",
+  };
+
+  function cycleFontFamily() {
+    const i = FONT_FAMILIES.indexOf(viewerFontFamily);
+    viewerFontFamily = FONT_FAMILIES[(i + 1) % FONT_FAMILIES.length];
+  }
+
+  function fontSizeDown() { if (viewerFontSize > 10) viewerFontSize--; }
+  function fontSizeUp() { if (viewerFontSize < 24) viewerFontSize++; }
+
+  let viewerStyle = $derived(`--vfs: ${viewerFontSize}px; --vff: ${FONT_CSS[viewerFontFamily]}`);
 
   // ── Directory navigation ─────────────────────────────────────────────
 
@@ -391,7 +411,9 @@
 
 <SidebarLayout showSidebar={!fileView && showTree} sidebarTitle="Files" fullWidth={fileView}>
   {#snippet headerExtra()}
-    <button class="up-btn" onclick={navigateUp} disabled={!directory} title="Up one level">&#8593;</button>
+    {#if directory}
+      <Breadcrumbs path={directory} onNavigate={zoomToDirectory} />
+    {/if}
     <label class="dotfile-toggle" title="Show dotfiles">
       <input type="checkbox" bind:checked={showHidden} onchange={() => loadTree()} />
       <span class="dotfile-label">.*</span>
@@ -412,20 +434,12 @@
   {/snippet}
 
   {#if !fileView}
-    <header>
-      <h1><span class="app-name">KVASIR</span> <span class="separator">::</span> <span class="subtitle">Workspace Inspector</span></h1>
-    </header>
+    <AppHeader appName="KVASIR" subtitle="Workspace Inspector" />
 
     <section class="controls">
       <div class="directory-row">
         <Button onclick={selectDirectory}>Select Directory</Button>
-        <input
-          type="text"
-          bind:value={directory}
-          placeholder="Or paste path here..."
-          class="directory-input"
-          onkeydown={(e) => e.key === 'Enter' && loadTree()}
-        />
+        <Input bind:value={directory} placeholder="Or paste path here..." onkeydown={(e) => e.key === 'Enter' && loadTree()} />
         <Button variant="primary" onclick={loadTree} disabled={!directory}>
           {loading ? "Loading..." : "Refresh"}
         </Button>
@@ -434,9 +448,7 @@
   {/if}
 
     {#if error}
-      <section class="error-banner">
-        {error}
-      </section>
+      <ErrorBanner onDismiss={() => error = null}>{error}</ErrorBanner>
     {/if}
 
     {#if isJsonlFile && selectedFile}
@@ -452,6 +464,7 @@
       </section>
       <section class="tabs">
         <button class="tab active">JSONL</button>
+        <FontControls bind:fontSize={viewerFontSize} bind:fontFamily={viewerFontFamily} />
         <button
           class="tab wrap-toggle"
           class:active={wrapMode !== "nowrap"}
@@ -461,6 +474,7 @@
           {wrapLabel()}
         </button>
       </section>
+      <div class="viewer-settings" style={viewerStyle}>
       <JsonlViewer
         commands={{
           read_jsonl_info: commands.read_jsonl_info,
@@ -474,6 +488,7 @@
         {getHljsLanguage}
         {refreshKey}
       />
+      </div>
     {:else if isTableFile && selectedFile}
       <!-- Table: independent path, no fileContent needed -->
       <section class="file-info">
@@ -487,7 +502,9 @@
       </section>
       <section class="tabs">
         <button class="tab active">Table</button>
+        <FontControls bind:fontSize={viewerFontSize} bind:fontFamily={viewerFontFamily} />
       </section>
+      <div class="viewer-settings" style={viewerStyle}>
       <TableViewer
         commands={{
           read_table: commands.read_table,
@@ -497,6 +514,7 @@
         path={selectedFile}
         {refreshKey}
       />
+      </div>
     {:else if fileContent}
       <section class="file-info">
         <div class="file-path">
@@ -550,6 +568,7 @@
             Inspect
           </button>
         {/if}
+        <FontControls bind:fontSize={viewerFontSize} bind:fontFamily={viewerFontFamily} />
         <button
           class="tab wrap-toggle"
           class:active={wrapMode !== "nowrap"}
@@ -565,6 +584,7 @@
         <FormatControls {dataFormats} bind:selectedFormat />
       {/if}
 
+      <div class="viewer-settings" style={viewerStyle}>
       <!-- Schema Inspector -->
       {#if activeTab === "inspect" && inspectedSchema}
         <section class="inspector-view">
@@ -579,39 +599,15 @@
 {/each}</code></pre>
         </section>
       {/if}
+      </div>
     {:else if !loading && directory}
-      <section class="empty-state">
-        <p>Select a file from the tree to view its contents</p>
-      </section>
+      <EmptyState message="Select a file from the tree to view its contents" />
     {:else if !directory && !fileView}
-      <section class="empty-state">
-        <p>Select a directory to browse files</p>
-      </section>
+      <EmptyState message="Select a directory to browse files" />
     {/if}
 </SidebarLayout>
 
 <style>
-  .up-btn {
-    background: none;
-    border: 1px solid var(--border-default);
-    border-radius: var(--radius-sm);
-    color: var(--text-secondary);
-    cursor: pointer;
-    padding: 0 var(--space-sm);
-    font-size: var(--text-sm);
-    line-height: 1.4;
-  }
-
-  .up-btn:hover:not(:disabled) {
-    color: var(--text-primary);
-    background: var(--bg-hover);
-  }
-
-  .up-btn:disabled {
-    opacity: 0.3;
-    cursor: default;
-  }
-
   .dotfile-toggle {
     display: flex;
     align-items: center;
@@ -634,37 +630,6 @@
     font-size: var(--text-xs);
   }
 
-  header {
-    margin-bottom: var(--space-xl);
-  }
-
-  h1 {
-    margin: 0;
-    font-size: var(--text-lg);
-    display: flex;
-    align-items: baseline;
-    gap: var(--space-md);
-  }
-
-  .app-name {
-    font-weight: 800;
-    letter-spacing: 0.12em;
-    color: var(--text-primary);
-  }
-
-  .separator {
-    color: var(--text-secondary);
-    font-weight: 300;
-    opacity: 0.5;
-  }
-
-  .subtitle {
-    font-weight: 300;
-    color: var(--text-secondary);
-    font-size: var(--text-sm);
-    letter-spacing: 0.04em;
-  }
-
   .controls {
     background: var(--bg-secondary);
     padding: var(--space-2xl);
@@ -675,24 +640,6 @@
   .directory-row {
     display: flex;
     gap: var(--space-md);
-  }
-
-  .directory-input {
-    flex: 1;
-    padding: var(--space-md) var(--space-xl);
-    border: 1px solid var(--border-default);
-    border-radius: var(--radius-sm);
-    background: var(--bg-primary);
-    color: var(--text-primary);
-    font-family: var(--font-body);
-  }
-
-  .error-banner {
-    background: var(--severity-error);
-    color: var(--text-primary);
-    padding: var(--space-lg) var(--space-xl);
-    border-radius: var(--radius-sm);
-    margin-bottom: var(--space-xl);
   }
 
   .file-info {
@@ -752,10 +699,28 @@
   }
 
   .wrap-toggle {
-    margin-left: auto;
     flex-shrink: 0;
     font-family: var(--font-mono);
     font-size: var(--text-xs);
+  }
+
+  .viewer-settings :global(.code-viewer pre) {
+    font-size: var(--vfs);
+    font-family: var(--vff);
+  }
+
+  .viewer-settings :global(table) {
+    font-size: var(--vfs);
+    font-family: var(--vff);
+  }
+
+  .viewer-settings :global(.markdown-preview) {
+    font-size: var(--vfs);
+    font-family: var(--vff);
+  }
+
+  .viewer-settings :global(.section-body) {
+    font-size: var(--vfs);
   }
 
   .code-viewer {
@@ -808,9 +773,4 @@
     overflow: auto;
   }
 
-  .empty-state {
-    text-align: center;
-    padding: 4rem var(--space-3xl);
-    color: var(--text-secondary);
-  }
 </style>

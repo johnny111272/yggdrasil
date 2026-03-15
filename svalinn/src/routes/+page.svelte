@@ -1,5 +1,8 @@
 <script lang="ts">
   import SvalinnView from "$lib/SvalinnView.svelte";
+  import { SoloContainer } from "@yggdrasil/ui";
 </script>
 
-<SvalinnView />
+<SoloContainer appName="svalinn">
+  <SvalinnView />
+</SoloContainer>

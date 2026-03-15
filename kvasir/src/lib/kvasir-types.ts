@@ -59,3 +59,4 @@ export interface KvasTreeNode extends FileTreeEntry {
 export type ViewTab = "code" | "data" | "preview" | "inspect" | "jsonl" | "table";
 export type DataFormat = "json" | "yaml" | "toml" | "toon" | "ron";
 export type WrapMode = "nowrap" | "wrap79" | "wrapwidth";
+export type FontFamily = "mono" | "dyslexie" | "sans" | "serif";

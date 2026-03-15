@@ -1,5 +1,6 @@
 <script lang="ts">
   import KvasirView from "$lib/KvasirView.svelte";
+  import { SoloContainer } from "@yggdrasil/ui";
   import { invoke } from "@tauri-apps/api/core";
   import { listen } from "@tauri-apps/api/event";
   import { onMount } from "svelte";
@@ -18,4 +19,6 @@
   });
 </script>
 
-<KvasirView {openFile} />
+<SoloContainer appName="kvasir">
+  <KvasirView {openFile} />
+</SoloContainer>

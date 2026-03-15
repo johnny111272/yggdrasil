@@ -1,10 +1,11 @@
 <script lang="ts">
   interface Props {
-    count: number;
+    count?: number;
+    text?: string;
     severity?: "blocked" | "error" | "warning" | "success" | "neutral";
   }
 
-  let { count, severity = "neutral" }: Props = $props();
+  let { count, text, severity = "neutral" }: Props = $props();
 
   function getColor(level: string): string {
     switch (level) {
@@ -18,7 +19,7 @@
 </script>
 
 <span class="badge" style="background: {getColor(severity)}">
-  {count}
+  {text ?? count}
 </span>
 
 <style>

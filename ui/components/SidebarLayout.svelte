@@ -9,6 +9,7 @@
     children?: Snippet;
     headerExtra?: Snippet;
     fullWidth?: boolean;
+    noPadding?: boolean;
     minWidth?: number;
     maxWidth?: number;
   }
@@ -21,6 +22,7 @@
     children,
     headerExtra,
     fullWidth = false,
+    noPadding = false,
     minWidth = 180,
     maxWidth = 600,
   }: Props = $props();
@@ -73,7 +75,7 @@
     </aside>
   {/if}
 
-  <div class="main-content" class:full-width={fullWidth} style={showSidebar ? `margin-left: ${sidebarWidth}px` : ''}>
+  <div class="main-content" class:full-width={fullWidth} class:no-padding={noPadding}>
     {#if children}
       {@render children()}
     {/if}
@@ -92,15 +94,13 @@
   }
 
   .sidebar {
-    position: fixed;
-    left: 0;
-    top: 0;
-    bottom: 0;
+    flex-shrink: 0;
+    position: relative;
     background: var(--bg-secondary);
     border-right: 1px solid var(--border-default);
     display: flex;
     flex-direction: column;
-    z-index: 100;
+    z-index: var(--z-sidebar);
   }
 
   .sidebar-header {
@@ -148,7 +148,7 @@
     bottom: 0;
     width: 6px;
     cursor: col-resize;
-    z-index: 101;
+    z-index: var(--z-resize);
   }
 
   .resize-handle:hover,
@@ -167,5 +167,9 @@
 
   .main-content.full-width {
     max-width: none;
+  }
+
+  .main-content.no-padding {
+    padding: 0;
   }
 </style>

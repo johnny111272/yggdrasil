@@ -3,7 +3,7 @@
   import SvalinnView from "$svalinn/SvalinnView.svelte";
   import KvasirView from "$kvasir/KvasirView.svelte";
   import RatatoskrView from "$ratatoskr/RatatoskrView.svelte";
-  import { ThemeSwitcher } from "@yggdrasil/ui";
+  import { ThemeSwitcher, YggContainer } from "@yggdrasil/ui";
   import { invoke } from "@tauri-apps/api/core";
   import { listen } from "@tauri-apps/api/event";
   import { onMount } from "svelte";
@@ -53,50 +53,59 @@
 <div class="shell">
   <div class="view-area">
     <div class="view-pane" class:active={activeTab === "hlidskjalf"}>
-      <HlidskjalfView commands={{
-        start_monitor: "hlid_start_monitor",
-        speak: "hlid_speak",
-        open_in_editor: "hlid_open_in_editor",
-      }} onOpenFile={(path, line) => {
-        openFilePath = path;
-        openFileLine = line ?? null;
-        selectTab("kvasir");
-      }} />
+      <YggContainer appName="hlidskjalf">
+        <HlidskjalfView commands={{
+          start_monitor: "hlid_start_monitor",
+          speak: "hlid_speak",
+          open_in_editor: "hlid_open_in_editor",
+        }} onOpenFile={(path, line) => {
+          openFilePath = path;
+          openFileLine = line ?? null;
+          selectTab("kvasir");
+        }} />
+      </YggContainer>
     </div>
     {#if mounted.has("svalinn")}
       <div class="view-pane" class:active={activeTab === "svalinn"}>
-        <SvalinnView commands={{
-          scan_directory: "sval_scan_directory",
-          list_qa_tree: "sval_list_qa_tree",
-          open_in_editor: "sval_open_in_editor",
-          run_saga: "sval_run_saga",
-        }} />
+        <YggContainer appName="svalinn">
+          <SvalinnView commands={{
+            scan_directory: "sval_scan_directory",
+            list_qa_tree: "sval_list_qa_tree",
+            open_in_editor: "sval_open_in_editor",
+            run_saga: "sval_run_saga",
+          }} />
+        </YggContainer>
       </div>
     {/if}
     {#if mounted.has("kvasir")}
       <div class="view-pane" class:active={activeTab === "kvasir"}>
-        <KvasirView commands={{
-          list_directory: "kvas_list_directory",
-          read_file: "kvas_read_file",
-          open_in_editor: "kvas_open_in_editor",
-          convert_to_all_formats: "kvas_convert_to_all_formats",
-          detect_data_format: "kvas_detect_data_format",
-          read_jsonl_info: "kvas_read_jsonl_info",
-          read_jsonl_entry: "kvas_read_jsonl_entry",
-          export_entry_as: "kvas_export_entry_as",
-          read_table: "kvas_read_table",
-          export_table_csv: "kvas_export_table_csv",
-        }} openFile={openFilePath} openLine={openFileLine} />
+        <YggContainer appName="kvasir">
+          <KvasirView commands={{
+            list_directory: "kvas_list_directory",
+            read_file: "kvas_read_file",
+            open_in_editor: "kvas_open_in_editor",
+            convert_to_all_formats: "kvas_convert_to_all_formats",
+            detect_data_format: "kvas_detect_data_format",
+            read_jsonl_info: "kvas_read_jsonl_info",
+            read_jsonl_entry: "kvas_read_jsonl_entry",
+            export_entry_as: "kvas_export_entry_as",
+            read_table: "kvas_read_table",
+            export_table_csv: "kvas_export_table_csv",
+          }} openFile={openFilePath} openLine={openFileLine} />
+        </YggContainer>
       </div>
     {/if}
     {#if mounted.has("ratatoskr")}
       <div class="view-pane" class:active={activeTab === "ratatoskr"}>
-        <RatatoskrView commands={{
-          load_graph: "rata_load_graph",
-          save_graph: "rata_save_graph",
-          get_graph_stats: "rata_get_graph_stats",
-          generate_sample_graph: "rata_generate_sample_graph",
-        }} />
+        <YggContainer appName="ratatoskr">
+          <RatatoskrView commands={{
+            list_directory: "rata_list_directory",
+            load_graph: "rata_load_graph",
+            save_graph: "rata_save_graph",
+            get_graph_stats: "rata_get_graph_stats",
+            generate_sample_graph: "rata_generate_sample_graph",
+          }} />
+        </YggContainer>
       </div>
     {/if}
   </div>

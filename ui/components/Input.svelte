@@ -5,9 +5,10 @@
     type?: "text" | "search" | "password";
     disabled?: boolean;
     oninput?: (e: Event) => void;
+    onkeydown?: (e: KeyboardEvent) => void;
   }
 
-  let { value = $bindable(""), placeholder = "", type = "text", disabled = false, oninput }: Props = $props();
+  let { value = $bindable(""), placeholder = "", type = "text", disabled = false, oninput, onkeydown }: Props = $props();
 </script>
 
 <input
@@ -17,6 +18,7 @@
   {placeholder}
   {disabled}
   {oninput}
+  {onkeydown}
 />
 
 <style>

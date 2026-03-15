@@ -4,5 +4,6 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+common_core = { path = "../common_core" }
 serde = { workspace = true }
 serde_json = { workspace = true }

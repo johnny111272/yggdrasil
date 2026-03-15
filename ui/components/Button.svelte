@@ -3,15 +3,18 @@
 
   interface Props {
     variant?: "primary" | "special" | "neutral" | "ghost";
+    size?: "sm" | "md";
+    active?: boolean;
     disabled?: boolean;
+    title?: string;
     onclick?: () => void;
     children?: Snippet;
   }
 
-  let { variant = "neutral", disabled = false, onclick, children }: Props = $props();
+  let { variant = "neutral", size = "md", active = false, disabled = false, title, onclick, children }: Props = $props();
 </script>
 
-<button class="btn btn-{variant}" {disabled} {onclick}>
+<button class="btn btn-{variant}" class:btn-sm={size === "sm"} class:active {disabled} {title} {onclick}>
   {#if children}
     {@render children()}
   {/if}
@@ -26,7 +29,17 @@
     font-size: var(--text-sm);
     color: var(--text-primary);
     cursor: pointer;
-    transition: background 0.15s ease;
+    transition: background var(--transition-normal);
+  }
+
+  .btn-sm {
+    padding: var(--space-xs) var(--space-md);
+    font-size: var(--text-xs);
+  }
+
+  .btn.active {
+    background: var(--action-primary);
+    color: var(--text-primary);
   }
 
   .btn:disabled {

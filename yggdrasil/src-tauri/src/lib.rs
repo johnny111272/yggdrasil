@@ -113,6 +113,11 @@ fn kvas_export_table_csv(headers: Vec<String>, rows: Vec<Vec<String>>, source_pa
 // ============================================================================
 
 #[tauri::command]
+fn rata_list_directory(directory: String, show_hidden: bool) -> Result<Vec<ratatoskr_core::FileTreeEntry>, String> {
+    ratatoskr_core::list_directory(&directory, show_hidden)
+}
+
+#[tauri::command]
 fn rata_load_graph(path: String) -> Result<ratatoskr_core::GraphData, String> {
     ratatoskr_core::load_graph(&path)
 }
@@ -175,6 +180,7 @@ pub fn run() {
             kvas_read_table,
             kvas_export_table_csv,
             // Ratatoskr
+            rata_list_directory,
             rata_load_graph,
             rata_save_graph,
             rata_get_graph_stats,

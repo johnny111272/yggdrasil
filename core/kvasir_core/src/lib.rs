@@ -5,14 +5,8 @@ use std::path::Path;
 // Data Structures
 // ============================================================================
 
-#[derive(Debug, Clone, Serialize)]
-pub struct KvasFileTreeEntry {
-    pub name: String,
-    pub path: String,
-    pub is_dir: bool,
-    pub extension: Option<String>,
-    pub size_bytes: u64,
-}
+/// Re-export shared FileTreeEntry as KvasFileTreeEntry for backward compatibility.
+pub type KvasFileTreeEntry = common_core::FileTreeEntry;
 
 #[derive(Debug, Clone, Serialize)]
 pub struct FileContent {
@@ -71,55 +65,7 @@ const MAX_TABLE_ROWS: usize = 100_000;
 // ============================================================================
 
 pub fn list_directory(directory: &str, show_hidden: bool) -> Result<Vec<KvasFileTreeEntry>, String> {
-    let dir_path = Path::new(directory);
-    if !dir_path.is_dir() {
-        return Err(format!("Not a directory: {}", directory));
-    }
-
-    let mut entries: Vec<KvasFileTreeEntry> = vec![];
-
-    let read_dir = std::fs::read_dir(dir_path)
-        .map_err(|e| format!("Failed to read directory: {}", e))?;
-
-    for entry in read_dir.flatten() {
-        let path = entry.path();
-        let name = entry.file_name().to_string_lossy().to_string();
-
-        if !show_hidden && name.starts_with('.') {
-            continue;
-        }
-
-        let is_dir = path.is_dir();
-        let extension = if !is_dir {
-            path.extension().map(|e| e.to_string_lossy().to_string())
-        } else {
-            None
-        };
-
-        let size_bytes = if !is_dir {
-            std::fs::metadata(&path).map(|m| m.len()).unwrap_or(0)
-        } else {
-            0
-        };
-
-        entries.push(KvasFileTreeEntry {
-            name,
-            path: path.to_string_lossy().to_string(),
-            is_dir,
-            extension,
-            size_bytes,
-        });
-    }
-
-    entries.sort_by(|a, b| {
-        match (a.is_dir, b.is_dir) {
-            (true, false) => std::cmp::Ordering::Less,
-            (false, true) => std::cmp::Ordering::Greater,
-            _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
-        }
-    });
-
-    Ok(entries)
+    common_core::list_directory(directory, show_hidden)
 }
 
 pub fn read_file(path: &str) -> Result<FileContent, String> {

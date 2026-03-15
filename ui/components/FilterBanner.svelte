@@ -20,7 +20,6 @@
     background: var(--bg-selected);
     padding: var(--space-lg) var(--space-xl);
     border-radius: var(--radius-sm);
-    margin-bottom: var(--space-xl);
     display: flex;
     justify-content: space-between;
     align-items: center;

@@ -1,5 +1,6 @@
 <script lang="ts">
   import HlidskjalfView from "$lib/HlidskjalfView.svelte";
+  import { SoloContainer } from "@yggdrasil/ui";
   import { invoke } from "@tauri-apps/api/core";
 
   function openFile(path: string, line?: number) {
@@ -7,4 +8,6 @@
   }
 </script>
 
-<HlidskjalfView onOpenFile={openFile} />
+<SoloContainer appName="hlidskjalf">
+  <HlidskjalfView onOpenFile={openFile} />
+</SoloContainer>

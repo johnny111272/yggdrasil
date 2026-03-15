@@ -2,6 +2,7 @@
   import { invoke } from "@tauri-apps/api/core";
   import { listen } from "@tauri-apps/api/event";
   import { onMount } from "svelte";
+  import { AppHeader, EmptyState, SidebarLayout, Button, ToggleGroup } from "@yggdrasil/ui";
 
   import QualityReport from "./QualityReport.svelte";
   import TrafficReport from "./TrafficReport.svelte";
@@ -95,21 +96,21 @@
 
   // ── Workspace colors ──────────────────────────────────────────────
 
-  const WORKSPACE_HUES = [
-    "hsl(210, 70%, 55%)",
-    "hsl(35, 85%, 55%)",
-    "hsl(0, 70%, 55%)",
-    "hsl(270, 60%, 60%)",
-    "hsl(160, 60%, 45%)",
-    "hsl(320, 60%, 55%)",
+  const WORKSPACE_TOKENS = [
+    "var(--ws-color-1)",
+    "var(--ws-color-2)",
+    "var(--ws-color-3)",
+    "var(--ws-color-4)",
+    "var(--ws-color-5)",
+    "var(--ws-color-6)",
   ];
 
   let workspaceColorMap: Map<string, string> = $state(new Map());
 
   function assignWorkspaceColor(workspace: string) {
     if (!workspace || workspaceColorMap.has(workspace)) return;
-    const idx = workspaceColorMap.size % WORKSPACE_HUES.length;
-    workspaceColorMap = new Map([...workspaceColorMap, [workspace, WORKSPACE_HUES[idx]]]);
+    const idx = workspaceColorMap.size % WORKSPACE_TOKENS.length;
+    workspaceColorMap = new Map([...workspaceColorMap, [workspace, WORKSPACE_TOKENS[idx]]]);
   }
 
   function workspaceColor(workspace: string): string {
@@ -128,6 +129,7 @@
   let feedElement: HTMLElement | undefined = $state();
   let expandedRows: Set<number> = $state(new Set());
   let autoExpand = $state(false);
+  let showControls = $state(true);
 
   function toggleRow(timestamp: number) {
     const next = new Set(expandedRows);
@@ -297,82 +299,84 @@
   }
 </script>
 
-<div class="watchtower">
-  <!-- Header bar -->
-  <header class="header">
-    <div class="header-left">
-      <h1 class="title"><span class="app-name">HLIDSKJALF</span> <span class="sep">::</span> <span class="subtitle">Agent Watchtower</span></h1>
+<SidebarLayout
+  showSidebar={showControls}
+  sidebarTitle="Controls"
+  onCloseSidebar={() => showControls = false}
+  fullWidth
+  noPadding
+>
+  {#snippet sidebar()}
+    <div class="sidebar-section">
       <span class="status" class:connected>
         {connected ? "listening" : "disconnected"}
       </span>
+      <div class="sidebar-stats">
+        <div class="stat">
+          <span class="stat-value">{stats.total}</span>
+          <span class="stat-label">events</span>
+        </div>
+        <div class="stat high">
+          <span class="stat-value">{stats.high}</span>
+          <span class="stat-label">high</span>
+        </div>
+        <div class="stat critical">
+          <span class="stat-value">{stats.critical}</span>
+          <span class="stat-label">critical</span>
+        </div>
+      </div>
     </div>
-    <div class="header-right">
-      <div class="stat">
-        <span class="stat-value">{stats.total}</span>
-        <span class="stat-label">events</span>
-      </div>
-      <div class="stat high">
-        <span class="stat-value">{stats.high}</span>
-        <span class="stat-label">high</span>
-      </div>
-      <div class="stat critical">
-        <span class="stat-value">{stats.critical}</span>
-        <span class="stat-label">critical</span>
+
+    <div class="sidebar-section">
+      <h4 class="sidebar-heading">Event Kinds</h4>
+      <div class="sidebar-controls">
+        <Button size="sm" active={allEnabled} onclick={toggleAll}>all</Button>
+        <ToggleGroup
+          options={datagramKinds.map(k => ({ value: k, label: k, icon: kindIcon(k) }))}
+          multi
+          selectedSet={enabledKinds}
+          onToggle={toggleKind}
+        />
       </div>
     </div>
-  </header>
 
-  <!-- Filter bar -->
-  <div class="filters">
-    <button
-      class="filter-btn"
-      class:active={allEnabled}
-      onclick={toggleAll}
-    >
-      all
-    </button>
-    {#each datagramKinds as kind}
-      <button
-        class="filter-btn"
-        class:active={enabledKinds.has(kind)}
-        onclick={() => toggleKind(kind)}
-      >
-        {kindIcon(kind)}
-        {kind}
-      </button>
-    {/each}
-    <div class="filter-spacer"></div>
-    <button
-      class="filter-btn"
-      class:active={autoExpand}
-      onclick={toggleExpandAll}
-      title={autoExpand ? "Collapse all" : "Expand all"}
-    >
-      {autoExpand ? "\u25BC" : "\u25B6"} expand
-    </button>
-    <label class="auto-scroll-toggle">
-      <input type="checkbox" bind:checked={autoScroll} />
-      auto-scroll
-    </label>
-    <button
-      class="voice-btn"
-      class:active={speechMinPriority < 5}
-      onclick={cycleSpeech}
-      title="Speech: {speechLabel()}"
-    >
-      {speechMinPriority >= 5 ? "\uD83D\uDD07" : "\uD83D\uDD0A"} {speechLabel()}
-    </button>
-    <button class="clear-btn" onclick={clearFeed}>clear</button>
-  </div>
+    <div class="sidebar-section">
+      <h4 class="sidebar-heading">Controls</h4>
+      <div class="sidebar-controls">
+        <Button size="sm" active={autoExpand} onclick={toggleExpandAll} title={autoExpand ? "Collapse all" : "Expand all"}>
+          {autoExpand ? "\u25BC" : "\u25B6"} expand
+        </Button>
+        <label class="auto-scroll-toggle">
+          <input type="checkbox" bind:checked={autoScroll} />
+          auto-scroll
+        </label>
+        <Button size="sm" active={speechMinPriority < 5} onclick={cycleSpeech} title="Speech: {speechLabel()}">
+          {speechMinPriority >= 5 ? "\uD83D\uDD07" : "\uD83D\uDD0A"} {speechLabel()}
+        </Button>
+        <Button size="sm" variant="ghost" onclick={clearFeed}>clear</Button>
+      </div>
+    </div>
+  {/snippet}
 
-  <!-- Event feed -->
-  <div class="feed" bind:this={feedElement}>
+  <div class="watchtower">
+    <AppHeader appName="HLIDSKJALF" subtitle="Agent Watchtower">
+      <span class="status" class:connected>
+        {connected ? "listening" : "disconnected"}
+      </span>
+      {#snippet right()}
+        {#if !showControls}
+          <Button variant="ghost" size="sm" onclick={() => showControls = true}>Controls</Button>
+        {/if}
+      {/snippet}
+    </AppHeader>
+
+    <div class="feed" bind:this={feedElement}>
 
     {#if filteredDatagrams.length === 0}
-      <div class="empty">
-        <p class="empty-icon">{connected ? "\uD83D\uDC41" : "\u23F3"}</p>
-        <p>{connected ? "Watching for events..." : "Connecting..."}</p>
-      </div>
+      <EmptyState
+        icon={connected ? "\uD83D\uDC41" : "\u23F3"}
+        message={connected ? "Watching for events..." : "Connecting..."}
+      />
     {:else}
       {#each filteredDatagrams as datagram}
         {@const isExpanded = expandedRows.has(datagram.timestamp)}
@@ -448,62 +452,20 @@
       {/each}
     {/if}
   </div>
-</div>
+  </div>
+</SidebarLayout>
 
 <style>
   .watchtower {
     display: flex;
     flex-direction: column;
-    height: 100vh;
+    height: 100%;
     background: var(--bg-primary);
     color: var(--text-primary);
     font-family: var(--font-mono);
   }
 
   /* ── Header ──────────────────────────────────────────────────────── */
-
-  .header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: var(--space-sm) var(--space-lg);
-    background: var(--bg-secondary);
-    border-bottom: 1px solid var(--bg-tertiary);
-    flex-shrink: 0;
-  }
-
-  .header-left {
-    display: flex;
-    align-items: baseline;
-    gap: var(--space-md);
-  }
-
-  .title {
-    font-size: var(--text-lg);
-    font-weight: 700;
-    margin: 0;
-    display: flex;
-    align-items: baseline;
-    gap: var(--space-md);
-  }
-
-  .app-name {
-    font-weight: 800;
-    letter-spacing: 0.12em;
-  }
-
-  .sep {
-    font-weight: 300;
-    opacity: 0.5;
-    color: var(--text-secondary);
-  }
-
-  .subtitle {
-    font-size: var(--text-sm);
-    font-weight: 300;
-    color: var(--text-secondary);
-    letter-spacing: 0.04em;
-  }
 
   .status {
     font-size: var(--text-xs);
@@ -515,11 +477,6 @@
 
   .status.connected {
     background: var(--severity-success);
-  }
-
-  .header-right {
-    display: flex;
-    gap: var(--space-lg);
   }
 
   .stat {
@@ -545,42 +502,33 @@
     color: var(--severity-error);
   }
 
-  /* ── Filters ─────────────────────────────────────────────────────── */
+  /* ── Sidebar ─────────────────────────────────────────────────────── */
 
-  .filters {
-    display: flex;
-    align-items: center;
-    gap: var(--space-xs);
-    padding: var(--space-xs) var(--space-lg);
-    background: var(--bg-secondary);
-    border-bottom: 1px solid var(--bg-tertiary);
-    flex-shrink: 0;
+  .sidebar-section {
+    padding: var(--space-md) var(--space-lg);
+    border-bottom: 1px solid var(--border-default);
   }
 
-  .filter-btn {
-    font-family: var(--font-mono);
+  .sidebar-heading {
+    margin: 0 0 var(--space-sm);
     font-size: var(--text-xs);
-    padding: 2px 10px;
-    border: 1px solid var(--bg-tertiary);
-    border-radius: var(--radius-full);
-    background: transparent;
+    font-weight: var(--fw-semibold);
     color: var(--text-secondary);
-    cursor: pointer;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
   }
 
-  .filter-btn:hover {
-    background: var(--bg-hover);
-    color: var(--text-primary);
+  .sidebar-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-xs);
+    align-items: center;
   }
 
-  .filter-btn.active {
-    background: var(--action-primary);
-    color: var(--text-primary);
-    border-color: var(--action-primary);
-  }
-
-  .filter-spacer {
-    flex: 1;
+  .sidebar-stats {
+    display: flex;
+    gap: var(--space-lg);
+    margin-top: var(--space-md);
   }
 
   .auto-scroll-toggle {
@@ -592,64 +540,12 @@
     gap: 4px;
   }
 
-  .voice-btn {
-    font-family: var(--font-mono);
-    font-size: var(--text-xs);
-    padding: 2px 10px;
-    border: 1px solid var(--bg-tertiary);
-    border-radius: var(--radius-full);
-    background: transparent;
-    color: var(--text-secondary);
-    cursor: pointer;
-  }
-
-  .voice-btn:hover {
-    background: var(--bg-hover);
-    color: var(--text-primary);
-  }
-
-  .voice-btn.active {
-    border-color: var(--action-primary);
-    color: var(--action-primary);
-  }
-
-  .clear-btn {
-    font-family: var(--font-mono);
-    font-size: var(--text-xs);
-    padding: 2px 10px;
-    border: 1px solid var(--bg-tertiary);
-    border-radius: var(--radius-full);
-    background: transparent;
-    color: var(--text-secondary);
-    cursor: pointer;
-  }
-
-  .clear-btn:hover {
-    background: var(--severity-error);
-    color: var(--bg-primary);
-    border-color: var(--severity-error);
-  }
-
   /* ── Feed ─────────────────────────────────────────────────────────── */
 
   .feed {
     flex: 1;
     overflow-y: auto;
     padding: var(--space-sm) var(--space-lg);
-  }
-
-  .empty {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    height: 100%;
-    color: var(--text-secondary);
-  }
-
-  .empty-icon {
-    font-size: 48px;
-    margin-bottom: var(--space-md);
   }
 
   /* ── Event row — priority visual weight ─────────────────────────── */

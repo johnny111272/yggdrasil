@@ -878,6 +878,9 @@ dependencies = [
 [[package]]
 name = "common_core"
 version = "0.1.0"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "compact_str"
@@ -3902,6 +3905,7 @@ dependencies = [
 name = "ratatoskr_core"
 version = "0.1.0"
 dependencies = [
+ "common_core",
  "serde",
  "serde_json",
 ]

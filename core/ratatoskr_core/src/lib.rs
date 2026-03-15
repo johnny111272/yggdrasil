@@ -3,6 +3,8 @@ use serde_json::Value;
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
+pub use common_core::{list_directory, FileTreeEntry};
+
 // ============================================================================
 // Graph Data Structures
 // ============================================================================

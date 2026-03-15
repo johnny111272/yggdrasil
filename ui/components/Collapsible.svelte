@@ -31,7 +31,6 @@
   .collapsible {
     background: var(--bg-secondary);
     border-radius: var(--radius-md);
-    margin-bottom: var(--space-md);
   }
 
   .collapsible summary {
