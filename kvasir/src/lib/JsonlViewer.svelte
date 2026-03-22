@@ -1,6 +1,14 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
-  import { Button } from "@yggdrasil/ui";
+  import { Button, ToggleGroup, Slider } from "@yggdrasil/ui";
+
+  const formatOptions = [
+    { value: "json", label: "JSON" },
+    { value: "yaml", label: "YAML" },
+    { value: "toml", label: "TOML" },
+    { value: "toon", label: "TOON" },
+    { value: "ron", label: "RON" },
+  ];
   import hljs from "highlight.js";
   import type { AllFormats, DataFormat, JsonlInfo, JsonlEntry, WrapMode } from "./kvasir-types";
 
@@ -165,40 +173,28 @@
 {#if jsonlInfo}
   <section class="jsonl-controls">
     <div class="jsonl-nav">
-      <button class="nav-btn" onclick={first} disabled={!jsonlEntry || jsonlEntry.index === 0}
-        title="First entry (Left arrow)">&#9664;</button>
-      <button class="nav-btn" onclick={prev} disabled={!jsonlEntry || jsonlEntry.index === 0}
-        title="Previous entry (Up arrow)">&#9650;</button>
-      <button class="nav-btn" onclick={next} disabled={!jsonlEntry || jsonlEntry.index >= jsonlInfo.entry_count - 1}
-        title="Next entry (Down arrow)">&#9660;</button>
-      <button class="nav-btn" onclick={last} disabled={!jsonlEntry || jsonlEntry.index >= jsonlInfo.entry_count - 1}
-        title="Last entry (Right arrow)">&#9654;</button>
+      <Button variant="neutral" size="sm" onclick={first} disabled={!jsonlEntry || jsonlEntry.index === 0}
+        title="First entry (Left arrow)">&#9664;</Button>
+      <Button variant="neutral" size="sm" onclick={prev} disabled={!jsonlEntry || jsonlEntry.index === 0}
+        title="Previous entry (Up arrow)">&#9650;</Button>
+      <Button variant="neutral" size="sm" onclick={next} disabled={!jsonlEntry || jsonlEntry.index >= jsonlInfo.entry_count - 1}
+        title="Next entry (Down arrow)">&#9660;</Button>
+      <Button variant="neutral" size="sm" onclick={last} disabled={!jsonlEntry || jsonlEntry.index >= jsonlInfo.entry_count - 1}
+        title="Last entry (Right arrow)">&#9654;</Button>
       <span class="jsonl-position">
         {scrubberIndex + 1} / {jsonlInfo.entry_count.toLocaleString()}
       </span>
     </div>
     {#if jsonlInfo.entry_count > 1}
-      <input
-        type="range"
-        class="jsonl-scrubber"
+      <Slider
+        value={scrubberIndex}
         min={0}
         max={jsonlInfo.entry_count - 1}
-        value={scrubberIndex}
         oninput={handleScrub}
       />
     {/if}
     <div class="jsonl-right">
-      <div class="format-selector">
-        {#each ["json", "yaml", "toml", "toon", "ron"] as fmt}
-          <button
-            class="format-btn"
-            class:active={jsonlFormat === fmt}
-            onclick={() => { jsonlFormat = fmt as DataFormat; convertEntry(); }}
-          >
-            {fmt.toUpperCase()}
-          </button>
-        {/each}
-      </div>
+      <ToggleGroup options={formatOptions} selected={jsonlFormat} onToggle={(v) => { jsonlFormat = v as DataFormat; convertEntry(); }} />
       <Button variant="ghost" onclick={exportEntry}>Open in Editor</Button>
     </div>
   </section>

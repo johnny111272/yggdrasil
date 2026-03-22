@@ -2,8 +2,8 @@
   import { invoke } from "@tauri-apps/api/core";
   import { homeDir } from "@tauri-apps/api/path";
   import { open } from "@tauri-apps/plugin-dialog";
-  import { onMount } from "svelte";
-  import { Button, SidebarLayout, TreeNode, AppHeader, ErrorBanner, EmptyState, Breadcrumbs, FontControls, Input } from "@yggdrasil/ui";
+  import { onMount, untrack } from "svelte";
+  import { Button, ContainerLayout, AppHeader, ErrorBanner, EmptyState } from "@yggdrasil/ui";
   import hljs from "highlight.js";
   import "highlight.js/styles/github-dark.css";
   import { marked } from "marked";
@@ -13,7 +13,7 @@
   import TableViewer from "./TableViewer.svelte";
   import FormatControls from "./FormatControls.svelte";
   import { analyzeSchema, type InspectedSchema } from "./schema-inspect";
-  import type { FileTreeEntry, FileContent, AllFormats, KvasTreeNode, ViewTab, DataFormat, WrapMode, FontFamily } from "./kvasir-types";
+  import type { FileTreeEntry, FileContent, AllFormats, KvasTreeNode, ViewTab, DataFormat, WrapMode } from "./kvasir-types";
 
   let {
     commands = {
@@ -30,6 +30,8 @@
     },
     openFile = null,
     openLine = null,
+    storagePrefix = "solo",
+    appTabs,
   }: {
     commands?: {
       list_directory: string;
@@ -45,17 +47,19 @@
     };
     openFile?: string | null;
     openLine?: number | null;
+    storagePrefix?: string;
+    appTabs?: { (): any };
   } = $props();
 
   // ── State ──────────────────────────────────────────────────────────────
 
   let directory = $state("");
+  let showHidden = $state(false);
   let treeRoot: KvasTreeNode | null = $state(null);
   let selectedFile: string | null = $state(null);
   let fileContent: FileContent | null = $state(null);
   let loading = $state(false);
   let error = $state("");
-  let showTree = $derived(treeRoot !== null);
   let activeTab: ViewTab = $state("code");
   let dataFormats: AllFormats | null = $state(null);
   let selectedFormat: DataFormat = $state("json");
@@ -65,12 +69,8 @@
   let isJsonlFile = $state(false);
   let isTableFile = $state(false);
   let inspectedSchema: InspectedSchema | null = $state(null);
-  let showHidden = $state(false);
   let wrapMode: WrapMode = $state("nowrap");
-  let viewerFontSize = $state(14);
-  let viewerFontFamily: FontFamily = $state("mono");
   let refreshKey = $state(0);
-  let fileView = $state(false);
 
   function refresh() {
     if (!selectedFile) return;
@@ -90,23 +90,24 @@
     return "wrap fit";
   }
 
-  const FONT_FAMILIES: FontFamily[] = ["mono", "dyslexie", "sans", "serif"];
-  const FONT_CSS: Record<FontFamily, string> = {
-    mono: "ui-monospace, SFMono-Regular, 'SF Mono', Menlo, monospace",
-    dyslexie: "'Dyslexie', sans-serif",
-    sans: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
-    serif: "Georgia, 'Times New Roman', serif",
-  };
+  // ── Mode bar ─────────────────────────────────────────────────────────
 
-  function cycleFontFamily() {
-    const i = FONT_FAMILIES.indexOf(viewerFontFamily);
-    viewerFontFamily = FONT_FAMILIES[(i + 1) % FONT_FAMILIES.length];
+  let modeOptions = $derived.by((): { value: string; label: string; icon?: string }[] => {
+    if (isJsonlFile) return [{ value: "jsonl", label: "JSONL", icon: "J" }];
+    if (isTableFile) return [{ value: "table", label: "Table", icon: "T" }];
+    if (!fileContent) return [];
+
+    const opts: { value: string; label: string; icon?: string }[] = [{ value: "code", label: "Code", icon: "C" }];
+    if (isMarkdownFile) opts.push({ value: "preview", label: "Preview", icon: "P" });
+    if (isDataFile) opts.push({ value: "data", label: "Data", icon: "D" });
+    if (isSchemaFile && inspectedSchema) opts.push({ value: "inspect", label: "Inspect", icon: "I" });
+    return opts;
+  });
+
+  // Sync activeTab when mode bar changes
+  function handleModeChange(value: string) {
+    activeTab = value as ViewTab;
   }
-
-  function fontSizeDown() { if (viewerFontSize > 10) viewerFontSize--; }
-  function fontSizeUp() { if (viewerFontSize < 24) viewerFontSize++; }
-
-  let viewerStyle = $derived(`--vfs: ${viewerFontSize}px; --vff: ${FONT_CSS[viewerFontFamily]}`);
 
   // ── Directory navigation ─────────────────────────────────────────────
 
@@ -125,9 +126,15 @@
     loadTree();
   }
 
-  function navigateUp() {
-    const parent = parentDir(directory);
-    if (parent) zoomToDirectory(parent);
+  function handleDirectoryChange(path: string) {
+    zoomToDirectory(path);
+  }
+
+  async function handleSetCwd() {
+    const selected = await open({ directory: true, multiple: false });
+    if (selected && typeof selected === "string") {
+      zoomToDirectory(selected);
+    }
   }
 
   onMount(async () => {
@@ -140,16 +147,10 @@
 
   // ── Tree operations ────────────────────────────────────────────────────
 
-  async function selectDirectory() {
-    const selected = await open({
-      directory: true,
-      multiple: false,
-    });
-    if (selected && typeof selected === "string") {
-      directory = selected;
-      await loadTree();
-    }
+  function getTreeNodes(): KvasTreeNode[] {
+    return treeRoot ? treeRoot.children : [];
   }
+  let treeNodes = $derived(getTreeNodes());
 
   async function loadTree() {
     if (!directory) return;
@@ -177,6 +178,13 @@
     }
     loading = false;
   }
+
+  // Reload tree when showHidden changes
+  $effect(() => {
+    // Read showHidden to track it
+    const _ = showHidden;
+    if (directory) loadTree();
+  });
 
   function findNode(root: KvasTreeNode, path: string): KvasTreeNode | null {
     if (root.path === path) return root;
@@ -283,9 +291,9 @@
 
   $effect(() => {
     if (openFile) {
-      fileView = true;
       const dir = parentDir(openFile);
-      if (dir && dir !== directory) {
+      const currentDir = untrack(() => directory);
+      if (dir && dir !== currentDir) {
         directory = dir;
         loadTree();
       }
@@ -405,243 +413,136 @@
 
   let renderedMarkdown = $derived.by(() => {
     if (!fileContent?.content || !isMarkdownFile) return "";
-    return marked(fileContent.content) as string;
+    const raw = fileContent.content;
+    const fmMatch = raw.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?/);
+    if (fmMatch) {
+      const frontmatter = "```yaml\n" + fmMatch[1].trim() + "\n```\n\n";
+      return marked(frontmatter + raw.slice(fmMatch[0].length)) as string;
+    }
+    return marked(raw) as string;
   });
 </script>
 
-<SidebarLayout showSidebar={!fileView && showTree} sidebarTitle="Files" fullWidth={fileView}>
-  {#snippet headerExtra()}
-    {#if directory}
-      <Breadcrumbs path={directory} onNavigate={zoomToDirectory} />
-    {/if}
-    <label class="dotfile-toggle" title="Show dotfiles">
-      <input type="checkbox" bind:checked={showHidden} onchange={() => loadTree()} />
-      <span class="dotfile-label">.*</span>
-    </label>
-  {/snippet}
-
-  {#snippet sidebar()}
-    {#if treeRoot}
-      <TreeNode
-        node={treeRoot}
-        selected={selectedFile}
-        onToggle={handleTreeToggle}
-        onSelect={handleTreeSelect}
-        onDblClickDir={zoomToDirectory}
-        getIcon={getFileIcon}
-      />
-    {/if}
-  {/snippet}
-
-  {#if !fileView}
+<ContainerLayout
+  appName="kvasir"
+  {storagePrefix}
+  sidebarMode="tree"
+  sidebarTitle="Files"
+  bind:directory
+  bind:showHidden
+  {treeNodes}
+  {selectedFile}
+  onTreeToggle={handleTreeToggle}
+  onTreeSelect={handleTreeSelect}
+  onTreeDblClickDir={zoomToDirectory}
+  onDirectoryChange={handleDirectoryChange}
+  onSetCwd={handleSetCwd}
+  getTreeIcon={getFileIcon}
+  {modeOptions}
+  activeMode={activeTab}
+  onModeChange={handleModeChange}
+  breadcrumbPath={directory}
+  onBreadcrumbNavigate={zoomToDirectory}
+  {appTabs}
+  fullWidth
+  noPadding
+>
+  {#if !selectedFile && !directory}
     <AppHeader appName="KVASIR" subtitle="Workspace Inspector" />
-
-    <section class="controls">
-      <div class="directory-row">
-        <Button onclick={selectDirectory}>Select Directory</Button>
-        <Input bind:value={directory} placeholder="Or paste path here..." onkeydown={(e) => e.key === 'Enter' && loadTree()} />
-        <Button variant="primary" onclick={loadTree} disabled={!directory}>
-          {loading ? "Loading..." : "Refresh"}
-        </Button>
-      </div>
-    </section>
   {/if}
 
-    {#if error}
-      <ErrorBanner onDismiss={() => error = null}>{error}</ErrorBanner>
+  {#if error}
+    <ErrorBanner onDismiss={() => error = ""}>{error}</ErrorBanner>
+  {/if}
+
+  {#if isJsonlFile && selectedFile}
+    <section class="file-info">
+      <div class="file-path">
+        <strong>{relativePath(selectedFile)}</strong>
+        <div class="file-actions">
+          <Button variant="ghost" onclick={cycleWrap} title="Cycle: no wrap → wrap 79 → wrap to width" active={wrapMode !== "nowrap"}>{wrapLabel()}</Button>
+          <Button variant="ghost" onclick={refresh}>Refresh</Button>
+        </div>
+      </div>
+    </section>
+    <JsonlViewer
+      commands={{
+        read_jsonl_info: commands.read_jsonl_info,
+        read_jsonl_entry: commands.read_jsonl_entry,
+        export_entry_as: commands.export_entry_as,
+        convert_to_all_formats: commands.convert_to_all_formats,
+        open_in_editor: commands.open_in_editor,
+      }}
+      path={selectedFile}
+      {wrapMode}
+      {getHljsLanguage}
+      {refreshKey}
+    />
+  {:else if isTableFile && selectedFile}
+    <section class="file-info">
+      <div class="file-path">
+        <strong>{relativePath(selectedFile)}</strong>
+        <div class="file-actions">
+          <Button variant="ghost" onclick={refresh}>Refresh</Button>
+        </div>
+      </div>
+    </section>
+    <TableViewer
+      commands={{
+        read_table: commands.read_table,
+        export_table_csv: commands.export_table_csv,
+        open_in_editor: commands.open_in_editor,
+      }}
+      path={selectedFile}
+      {refreshKey}
+    />
+  {:else if fileContent}
+    <section class="file-info">
+      <div class="file-path">
+        <strong>{relativePath(fileContent.path)}</strong>
+        <div class="file-actions">
+          <Button variant="ghost" onclick={refresh}>Refresh</Button>
+          <Button variant="ghost" onclick={() => openInEditor()}>Open in Editor</Button>
+        </div>
+      </div>
+      <div class="file-meta">
+        <span class="meta-item">Language: <strong>{fileContent.language}</strong></span>
+        <span class="meta-item">Lines: <strong>{fileContent.line_count}</strong></span>
+        <span class="meta-item">Size: <strong>{formatBytes(fileContent.size_bytes)}</strong></span>
+      </div>
+    </section>
+
+    <!-- Data view format selector -->
+    {#if activeTab === "data" && dataFormats}
+      <FormatControls {dataFormats} bind:selectedFormat />
     {/if}
 
-    {#if isJsonlFile && selectedFile}
-      <!-- JSONL: independent path, no fileContent needed -->
-      <section class="file-info">
-        <div class="file-path">
-          <strong>{relativePath(selectedFile)}</strong>
-          <div class="file-actions">
-            <Button variant="ghost" onclick={() => fileView = !fileView}>{fileView ? "Browse" : "Focus"}</Button>
-            <Button variant="ghost" onclick={refresh}>Refresh</Button>
-          </div>
-        </div>
-      </section>
-      <section class="tabs">
-        <button class="tab active">JSONL</button>
-        <FontControls bind:fontSize={viewerFontSize} bind:fontFamily={viewerFontFamily} />
-        <button
-          class="tab wrap-toggle"
-          class:active={wrapMode !== "nowrap"}
-          onclick={cycleWrap}
-          title="Cycle: no wrap → wrap 79 → wrap to width"
-        >
-          {wrapLabel()}
-        </button>
-      </section>
-      <div class="viewer-settings" style={viewerStyle}>
-      <JsonlViewer
-        commands={{
-          read_jsonl_info: commands.read_jsonl_info,
-          read_jsonl_entry: commands.read_jsonl_entry,
-          export_entry_as: commands.export_entry_as,
-          convert_to_all_formats: commands.convert_to_all_formats,
-          open_in_editor: commands.open_in_editor,
-        }}
-        path={selectedFile}
-        {wrapMode}
-        {getHljsLanguage}
-        {refreshKey}
-      />
-      </div>
-    {:else if isTableFile && selectedFile}
-      <!-- Table: independent path, no fileContent needed -->
-      <section class="file-info">
-        <div class="file-path">
-          <strong>{relativePath(selectedFile)}</strong>
-          <div class="file-actions">
-            <Button variant="ghost" onclick={() => fileView = !fileView}>{fileView ? "Browse" : "Focus"}</Button>
-            <Button variant="ghost" onclick={refresh}>Refresh</Button>
-          </div>
-        </div>
-      </section>
-      <section class="tabs">
-        <button class="tab active">Table</button>
-        <FontControls bind:fontSize={viewerFontSize} bind:fontFamily={viewerFontFamily} />
-      </section>
-      <div class="viewer-settings" style={viewerStyle}>
-      <TableViewer
-        commands={{
-          read_table: commands.read_table,
-          export_table_csv: commands.export_table_csv,
-          open_in_editor: commands.open_in_editor,
-        }}
-        path={selectedFile}
-        {refreshKey}
-      />
-      </div>
-    {:else if fileContent}
-      <section class="file-info">
-        <div class="file-path">
-          <strong>{relativePath(fileContent.path)}</strong>
-          <div class="file-actions">
-            <Button variant="ghost" onclick={() => fileView = !fileView}>{fileView ? "Browse" : "Focus"}</Button>
-            <Button variant="ghost" onclick={refresh}>Refresh</Button>
-            <Button variant="ghost" onclick={() => openInEditor()}>Open in Editor</Button>
-          </div>
-        </div>
-        <div class="file-meta">
-          <span class="meta-item">Language: <strong>{fileContent.language}</strong></span>
-          <span class="meta-item">Lines: <strong>{fileContent.line_count}</strong></span>
-          <span class="meta-item">Size: <strong>{formatBytes(fileContent.size_bytes)}</strong></span>
-        </div>
-      </section>
+    <div class="content-controls">
+      <Button variant="ghost" onclick={cycleWrap} title="Cycle: no wrap → wrap 79 → wrap to width" active={wrapMode !== "nowrap"}>{wrapLabel()}</Button>
+    </div>
 
-      <!-- Tabs -->
-      <section class="tabs">
-        <button
-          class="tab"
-          class:active={activeTab === "code"}
-          onclick={() => activeTab = "code"}
-        >
-          Code
-        </button>
-        {#if isMarkdownFile}
-          <button
-            class="tab"
-            class:active={activeTab === "preview"}
-            onclick={() => activeTab = "preview"}
-          >
-            Preview
-          </button>
-        {/if}
-        {#if isDataFile}
-          <button
-            class="tab"
-            class:active={activeTab === "data"}
-            onclick={() => activeTab = "data"}
-          >
-            Data
-          </button>
-        {/if}
-        {#if isSchemaFile && inspectedSchema}
-          <button
-            class="tab"
-            class:active={activeTab === "inspect"}
-            onclick={() => activeTab = "inspect"}
-          >
-            Inspect
-          </button>
-        {/if}
-        <FontControls bind:fontSize={viewerFontSize} bind:fontFamily={viewerFontFamily} />
-        <button
-          class="tab wrap-toggle"
-          class:active={wrapMode !== "nowrap"}
-          onclick={cycleWrap}
-          title="Cycle: no wrap → wrap 79 → wrap to width"
-        >
-          {wrapLabel()}
-        </button>
+    <!-- Schema Inspector -->
+    {#if activeTab === "inspect" && inspectedSchema}
+      <section class="inspector-view">
+        <SchemaInspector schema={inspectedSchema} />
       </section>
-
-      <!-- Data view format selector and token stats -->
-      {#if activeTab === "data" && dataFormats}
-        <FormatControls {dataFormats} bind:selectedFormat />
-      {/if}
-
-      <div class="viewer-settings" style={viewerStyle}>
-      <!-- Schema Inspector -->
-      {#if activeTab === "inspect" && inspectedSchema}
-        <section class="inspector-view">
-          <SchemaInspector schema={inspectedSchema} />
-        </section>
-      <!-- Markdown Preview -->
-      {:else if activeTab === "preview" && isMarkdownFile}
-        <MarkdownPreview content={renderedMarkdown} />
-      {:else}
-        <section class="code-viewer" class:wrap79={wrapMode === "wrap79"} class:wrapwidth={wrapMode === "wrapwidth"}>
-          <pre><code>{#each displayContent.split('\n') as line, i}{@const highlighted = highlightedContent.split('\n')[i] || ''}<span class="line-number" data-line={i + 1}>{i + 1}</span><span class="line-content">{@html highlighted}</span>
+    <!-- Markdown Preview -->
+    {:else if activeTab === "preview" && isMarkdownFile}
+      <MarkdownPreview content={renderedMarkdown} />
+    {:else}
+      <section class="code-viewer" class:wrap79={wrapMode === "wrap79"} class:wrapwidth={wrapMode === "wrapwidth"}>
+        <pre><code>{#each displayContent.split('\n') as line, i}{@const highlighted = highlightedContent.split('\n')[i] || ''}<span class="line-number" data-line={i + 1}>{i + 1}</span><span class="line-content">{@html highlighted}</span>
 {/each}</code></pre>
-        </section>
-      {/if}
-      </div>
-    {:else if !loading && directory}
-      <EmptyState message="Select a file from the tree to view its contents" />
-    {:else if !directory && !fileView}
-      <EmptyState message="Select a directory to browse files" />
+      </section>
     {/if}
-</SidebarLayout>
+  {:else if !loading && directory}
+    <EmptyState message="Select a file from the tree to view its contents" />
+  {:else if !directory}
+    <EmptyState message="Select a directory to browse files" />
+  {/if}
+</ContainerLayout>
 
 <style>
-  .dotfile-toggle {
-    display: flex;
-    align-items: center;
-    gap: var(--space-xs);
-    cursor: pointer;
-    font-size: var(--text-sm);
-    color: var(--text-secondary);
-  }
-
-  .dotfile-toggle:hover {
-    color: var(--text-primary);
-  }
-
-  .dotfile-toggle input {
-    cursor: pointer;
-  }
-
-  .dotfile-label {
-    font-family: var(--font-mono);
-    font-size: var(--text-xs);
-  }
-
-  .controls {
-    background: var(--bg-secondary);
-    padding: var(--space-2xl);
-    border-radius: var(--radius-md);
-    margin-bottom: var(--space-2xl);
-  }
-
-  .directory-row {
-    display: flex;
-    gap: var(--space-md);
-  }
-
   .file-info {
     background: var(--bg-secondary);
     padding: var(--space-xl);
@@ -673,54 +574,10 @@
     color: var(--text-primary);
   }
 
-  .tabs {
+  .content-controls {
     display: flex;
     gap: var(--space-sm);
     margin-bottom: var(--space-lg);
-  }
-
-  .tab {
-    padding: var(--space-sm) var(--space-xl);
-    border: none;
-    border-radius: var(--radius-sm) var(--radius-sm) 0 0;
-    background: var(--action-neutral);
-    color: var(--text-primary);
-    cursor: pointer;
-    font-size: var(--text-sm);
-  }
-
-  .tab:hover {
-    background: var(--action-neutral-hover);
-  }
-
-  .tab.active {
-    background: var(--bg-secondary);
-    border-bottom: 2px solid var(--action-primary);
-  }
-
-  .wrap-toggle {
-    flex-shrink: 0;
-    font-family: var(--font-mono);
-    font-size: var(--text-xs);
-  }
-
-  .viewer-settings :global(.code-viewer pre) {
-    font-size: var(--vfs);
-    font-family: var(--vff);
-  }
-
-  .viewer-settings :global(table) {
-    font-size: var(--vfs);
-    font-family: var(--vff);
-  }
-
-  .viewer-settings :global(.markdown-preview) {
-    font-size: var(--vfs);
-    font-family: var(--vff);
-  }
-
-  .viewer-settings :global(.section-body) {
-    font-size: var(--vfs);
   }
 
   .code-viewer {
@@ -734,7 +591,7 @@
     padding: var(--space-xl);
     overflow-x: auto;
     font-family: var(--font-mono);
-    font-size: var(--text-sm);
+    font-size: var(--content-font-size, 14px);
     line-height: 1.6;
   }
 
@@ -772,5 +629,4 @@
     border-radius: var(--radius-md);
     overflow: auto;
   }
-
 </style>

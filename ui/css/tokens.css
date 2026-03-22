@@ -19,6 +19,7 @@
   --bg-primary: #1a1a2e;        /* Body background */
   --bg-secondary: #16213e;      /* Panels, cards, sidebar */
   --bg-tertiary: #262640;       /* Borders, dividers */
+  --bg-control: #2a3a5c;        /* Toggle bars, mode bars — discoverable interactive strips */
   --bg-hover: #1d2a4d;          /* Hover state */
   --bg-selected: #2d3a5d;       /* Selected/active state */
 
@@ -153,6 +154,7 @@ body[data-theme="light"] {
   --bg-primary: #ffffff;
   --bg-secondary: #f5f5f5;
   --bg-tertiary: #e8e8e8;
+  --bg-control: #c8c8c8;        /* Toggle bars, mode bars */
   --bg-hover: #ebebeb;
   --bg-selected: #dde4f0;
 
@@ -206,6 +208,7 @@ body[data-theme="warm-dark"] {
   --bg-primary: #1e1e1e;
   --bg-secondary: #252525;
   --bg-tertiary: #333333;
+  --bg-control: #4a3e34;        /* Toggle bars, mode bars */
   --bg-hover: #2e2a26;
   --bg-selected: #3d3530;
 
@@ -256,6 +259,7 @@ body[data-theme="cool-dark"] {
   --bg-primary: #1b2b34;
   --bg-secondary: #1f2d38;
   --bg-tertiary: #2b3d48;
+  --bg-control: #2e4452;        /* Toggle bars, mode bars */
   --bg-hover: #243540;
   --bg-selected: #2d4050;
 

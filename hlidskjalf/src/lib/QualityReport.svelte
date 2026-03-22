@@ -45,6 +45,8 @@
     onOpenFile?: (path: string, line?: number) => void;
   }
 
+  import { Button } from "@yggdrasil/ui";
+
   let { payload, workspace, timestamp, onOpenFile }: Props = $props();
 
   // ── Path resolution ────────────────────────────────────────────────
@@ -128,26 +130,20 @@
       <div class="group-locations">
         {#each group.locations as loc}
           {#if loc.line !== undefined}
-            <button
-              class="location-link"
+            <Button variant="ghost" class="location-link" disabled={!onOpenFile}
               onclick={() => onOpenFile?.(resolvePath(loc.file), loc.line)}
-              disabled={!onOpenFile}
-            >{loc.file}:{loc.line}</button>
+            >{loc.file}:{loc.line}</Button>
           {:else if loc.lines}
             <div class="location-group">
-              <button
-                class="location-link"
+              <Button variant="ghost" class="location-link" disabled={!onOpenFile}
                 onclick={() => onOpenFile?.(resolvePath(loc.file), loc.lines?.[0])}
-                disabled={!onOpenFile}
-              >{loc.file}</button>
+              >{loc.file}</Button>
               <span class="location-lines">[{loc.lines.join(",")}]</span>
             </div>
           {:else}
-            <button
-              class="location-link"
+            <Button variant="ghost" class="location-link" disabled={!onOpenFile}
               onclick={() => onOpenFile?.(resolvePath(loc.file))}
-              disabled={!onOpenFile}
-            >{loc.file}</button>
+            >{loc.file}</Button>
           {/if}
         {/each}
       </div>

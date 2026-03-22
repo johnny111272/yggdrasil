@@ -20,3 +20,8 @@ export { default as ErrorBanner } from './components/ErrorBanner.svelte';
 export { default as Breadcrumbs } from './components/Breadcrumbs.svelte';
 export { default as FontControls } from './components/FontControls.svelte';
 export { default as ToggleGroup } from './components/ToggleGroup.svelte';
+export { default as SettingsBar } from './components/SettingsBar.svelte';
+export { default as ModeBar } from './components/ModeBar.svelte';
+export { default as ContainerLayout } from './components/ContainerLayout.svelte';
+export { default as Checkbox } from './components/Checkbox.svelte';
+export { default as Slider } from './components/Slider.svelte';

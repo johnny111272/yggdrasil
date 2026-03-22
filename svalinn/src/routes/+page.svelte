@@ -3,6 +3,6 @@
   import { SoloContainer } from "@yggdrasil/ui";
 </script>
 
-<SoloContainer appName="svalinn">
+<SoloContainer>
   <SvalinnView />
 </SoloContainer>

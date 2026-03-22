@@ -8,6 +8,6 @@
   }
 </script>
 
-<SoloContainer appName="hlidskjalf">
+<SoloContainer>
   <HlidskjalfView onOpenFile={openFile} />
 </SoloContainer>

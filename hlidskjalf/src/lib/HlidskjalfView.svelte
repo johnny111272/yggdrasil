@@ -2,7 +2,7 @@
   import { invoke } from "@tauri-apps/api/core";
   import { listen } from "@tauri-apps/api/event";
   import { onMount } from "svelte";
-  import { AppHeader, EmptyState, SidebarLayout, Button, ToggleGroup } from "@yggdrasil/ui";
+  import { AppHeader, EmptyState, ContainerLayout, Button, ToggleGroup } from "@yggdrasil/ui";
 
   import QualityReport from "./QualityReport.svelte";
   import TrafficReport from "./TrafficReport.svelte";
@@ -15,9 +15,13 @@
       open_in_editor: "open_in_editor",
     },
     onOpenFile,
+    storagePrefix = "solo",
+    appTabs,
   }: {
     commands?: { start_monitor: string; speak: string; open_in_editor: string };
     onOpenFile?: (path: string, line?: number) => void;
+    storagePrefix?: string;
+    appTabs?: { (): any };
   } = $props();
 
   function handleOpenFile(path: string, line?: number) {
@@ -129,8 +133,6 @@
   let feedElement: HTMLElement | undefined = $state();
   let expandedRows: Set<number> = $state(new Set());
   let autoExpand = $state(false);
-  let showControls = $state(true);
-
   function toggleRow(timestamp: number) {
     const next = new Set(expandedRows);
     if (next.has(timestamp)) next.delete(timestamp);
@@ -149,6 +151,10 @@
   }
 
   // ── Derived ────────────────────────────────────────────────────────
+
+  let datagramKinds = $derived([
+    ...new Set(datagrams.map((entry) => entry.kind)),
+  ]);
 
   let allEnabled = $derived(datagramKinds.length > 0 && datagramKinds.every((kind) => enabledKinds.has(kind)));
 
@@ -171,10 +177,6 @@
     }),
   );
 
-  let datagramKinds = $derived([
-    ...new Set(datagrams.map((entry) => entry.kind)),
-  ]);
-
   let stats = $derived({
     total: datagrams.length,
     critical: datagrams.filter((entry) => entry.priority === "critical").length,
@@ -183,8 +185,10 @@
 
   // ── Lifecycle ──────────────────────────────────────────────────────
 
-  onMount(async () => {
-    const unlisten = await listen<Datagram>("datagram", (event) => {
+  onMount(() => {
+    let unlisten: (() => void) | undefined;
+
+    listen<Datagram>("datagram", (event) => {
       const incoming = event.payload;
       const cutoff = Date.now() / 1000 - 3600;
 
@@ -207,18 +211,13 @@
           feedElement!.scrollTop = feedElement!.scrollHeight;
         });
       }
-    });
+    }).then((fn) => { unlisten = fn; });
 
-    try {
-      await invoke(commands.start_monitor);
-      connected = true;
-    } catch {
-      connected = false;
-    }
+    invoke(commands.start_monitor)
+      .then(() => { connected = true; })
+      .catch(() => { connected = false; });
 
-    return () => {
-      unlisten();
-    };
+    return () => { unlisten?.(); };
   });
 
   // ── Path detection ────────────────────────────────────────────────
@@ -299,12 +298,20 @@
   }
 </script>
 
-<SidebarLayout
-  showSidebar={showControls}
+<ContainerLayout
+  appName="hlidskjalf"
+  {storagePrefix}
+  sidebarMode="custom"
   sidebarTitle="Controls"
-  onCloseSidebar={() => showControls = false}
+  {appTabs}
   fullWidth
   noPadding
+  modeOptions={[
+    { value: "scroll", label: "Auto-scroll", icon: "\u25BC" },
+    { value: "paused", label: "Paused", icon: "\u275A\u275A" },
+  ]}
+  activeMode={autoScroll ? "scroll" : "paused"}
+  onModeChange={(v) => { autoScroll = v === "scroll"; }}
 >
   {#snippet sidebar()}
     <div class="sidebar-section">
@@ -346,10 +353,6 @@
         <Button size="sm" active={autoExpand} onclick={toggleExpandAll} title={autoExpand ? "Collapse all" : "Expand all"}>
           {autoExpand ? "\u25BC" : "\u25B6"} expand
         </Button>
-        <label class="auto-scroll-toggle">
-          <input type="checkbox" bind:checked={autoScroll} />
-          auto-scroll
-        </label>
         <Button size="sm" active={speechMinPriority < 5} onclick={cycleSpeech} title="Speech: {speechLabel()}">
           {speechMinPriority >= 5 ? "\uD83D\uDD07" : "\uD83D\uDD0A"} {speechLabel()}
         </Button>
@@ -363,11 +366,6 @@
       <span class="status" class:connected>
         {connected ? "listening" : "disconnected"}
       </span>
-      {#snippet right()}
-        {#if !showControls}
-          <Button variant="ghost" size="sm" onclick={() => showControls = true}>Controls</Button>
-        {/if}
-      {/snippet}
     </AppHeader>
 
     <div class="feed" bind:this={feedElement}>
@@ -403,16 +401,16 @@
             {#if isCanary}
               <span class="col-source-inline">{datagram.source}</span>
               {#if datagram.workspace}
-                <button class="col-workspace workspace-link" style="color: {workspaceColor(datagram.workspace)}" onclick={(event) => { event.stopPropagation(); handleOpenFile(resolveNotation(datagram.workspace)); }}>{datagram.workspace}</button>
+                <Button variant="ghost" class="col-workspace workspace-link" style="color: {workspaceColor(datagram.workspace)}" onclick={(event) => { event.stopPropagation(); handleOpenFile(resolveNotation(datagram.workspace)); }}>{datagram.workspace}</Button>
               {/if}
             {:else}
               <span class="col-kind-label">{kindLabel(datagram.kind)}</span>
               {#if datagram.classifier}
                 <span class="col-classifier">{datagram.classifier}</span>
               {/if}
-              <button class="col-workspace workspace-link" style="color: {workspaceColor(datagram.workspace)}" onclick={(event) => { event.stopPropagation(); handleOpenFile(resolveNotation(datagram.workspace)); }}>{datagram.workspace}</button>
+              <Button variant="ghost" class="col-workspace workspace-link" style="color: {workspaceColor(datagram.workspace)}" onclick={(event) => { event.stopPropagation(); handleOpenFile(resolveNotation(datagram.workspace)); }}>{datagram.workspace}</Button>
               {#if datagram.detail}
-                <span class="col-detail">{#each parsePathSegments(datagram.detail) as segment}{#if segment.path}<button class="detail-path-link" onclick={(event) => { event.stopPropagation(); handleOpenFile(segment.path!, segment.line); }}>{segment.text}</button>{:else}{segment.text}{/if}{/each}</span>
+                <span class="col-detail">{#each parsePathSegments(datagram.detail) as segment}{#if segment.path}<Button variant="ghost" class="detail-path-link" onclick={(event) => { event.stopPropagation(); handleOpenFile(segment.path!, segment.line); }}>{segment.text}</Button>{:else}{segment.text}{/if}{/each}</span>
               {/if}
               {#if hasPayload && !isExpanded}
                 <span class="col-expand-hint">+</span>
@@ -430,16 +428,16 @@
                   <span class="expanded-badge">{datagram.classifier}</span>
                 {/if}
               </div>
-              {#if datagram.kind === "quality"}
+              {#if datagram.kind === "quality" && datagram.payload}
                 <QualityReport
-                  payload={datagram.payload}
+                  payload={datagram.payload as any}
                   workspace={datagram.workspace}
                   timestamp={formatTime(datagram.timestamp)}
                   onOpenFile={handleOpenFile}
                 />
-              {:else if datagram.kind === "traffic"}
+              {:else if datagram.kind === "traffic" && datagram.payload}
                 <TrafficReport
-                  payload={datagram.payload}
+                  payload={datagram.payload as any}
                   workspace={datagram.workspace}
                   timestamp={formatTime(datagram.timestamp)}
                 />
@@ -453,7 +451,7 @@
     {/if}
   </div>
   </div>
-</SidebarLayout>
+</ContainerLayout>
 
 <style>
   .watchtower {
@@ -529,15 +527,6 @@
     display: flex;
     gap: var(--space-lg);
     margin-top: var(--space-md);
-  }
-
-  .auto-scroll-toggle {
-    font-size: var(--text-xs);
-    color: var(--text-secondary);
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    gap: 4px;
   }
 
   /* ── Feed ─────────────────────────────────────────────────────────── */

@@ -5,7 +5,7 @@
   interface Props {
     title: string;
     badgeCount?: number;
-    badgeSeverity?: "blocked" | "error" | "warning" | "info" | "neutral";
+    badgeSeverity?: "blocked" | "error" | "warning" | "success" | "neutral";
     open?: boolean;
     children?: Snippet;
   }

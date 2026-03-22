@@ -1,5 +1,14 @@
 <script lang="ts">
+  import { ToggleGroup } from "@yggdrasil/ui";
   import type { AllFormats, DataFormat } from "./kvasir-types";
+
+  const formatOptions = [
+    { value: "json", label: "JSON" },
+    { value: "yaml", label: "YAML" },
+    { value: "toml", label: "TOML" },
+    { value: "toon", label: "TOON" },
+    { value: "ron", label: "RON" },
+  ];
 
   let {
     dataFormats,
@@ -25,18 +34,7 @@
 </script>
 
 <section class="data-controls">
-  <div class="format-selector">
-    {#each ["json", "yaml", "toml", "toon", "ron"] as fmt}
-      <button
-        class="format-btn"
-        class:active={selectedFormat === fmt}
-        class:source={tokenStats.source === fmt}
-        onclick={() => selectedFormat = fmt as DataFormat}
-      >
-        {fmt.toUpperCase()}
-      </button>
-    {/each}
-  </div>
+  <ToggleGroup options={formatOptions} bind:selected={selectedFormat} highlightValue={tokenStats.source} />
   <div class="token-stats">
     <span class="token-label">Tokens:</span>
     {#each ["json", "yaml", "toml", "toon", "ron"] as fmt}
@@ -68,34 +66,6 @@
     align-items: center;
     flex-wrap: wrap;
     gap: var(--space-lg);
-  }
-
-  .format-selector {
-    display: flex;
-    gap: var(--space-sm);
-  }
-
-  .format-btn {
-    padding: var(--space-sm) var(--space-lg);
-    border: none;
-    border-radius: var(--radius-sm);
-    background: var(--action-neutral);
-    color: var(--text-primary);
-    cursor: pointer;
-    font-size: var(--text-sm);
-    font-weight: 500;
-  }
-
-  .format-btn:hover {
-    background: var(--action-neutral-hover);
-  }
-
-  .format-btn.active {
-    background: var(--action-primary);
-  }
-
-  .format-btn.source {
-    border: 2px solid var(--action-primary);
   }
 
   .token-stats {

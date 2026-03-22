@@ -1,7 +1,7 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
   import { open, save } from "@tauri-apps/plugin-dialog";
-  import { Button, AppHeader, ErrorBanner, EmptyState, SidebarLayout, TreeNode, Breadcrumbs } from "@yggdrasil/ui";
+  import { Button, ContainerLayout, AppHeader, ErrorBanner, EmptyState } from "@yggdrasil/ui";
   import { onMount } from "svelte";
   import * as d3 from "d3";
 
@@ -13,6 +13,8 @@
       get_graph_stats: "get_graph_stats",
       generate_sample_graph: "generate_sample_graph",
     },
+    storagePrefix = "solo",
+    appTabs,
   }: {
     commands?: {
       list_directory: string;
@@ -21,6 +23,8 @@
       get_graph_stats: string;
       generate_sample_graph: string;
     };
+    storagePrefix?: string;
+    appTabs?: { (): any };
   } = $props();
 
   interface GraphNode {
@@ -29,7 +33,6 @@
     node_type: string;
     color?: string | null;
     metadata: Record<string, unknown>;
-    // D3 simulation properties
     x?: number;
     y?: number;
     fx?: number | null;
@@ -58,17 +61,6 @@
     density: number;
   }
 
-  let graphData: GraphData | null = $state(null);
-  let stats: GraphStats | null = $state(null);
-  let selectedNode: GraphNode | null = $state(null);
-  let error = $state("");
-  let loading = $state(false);
-  let showStats = $state(true);
-  let showSidebar = $state(true);
-  let svgElement: SVGSVGElement;
-  let simulation: d3.Simulation<GraphNode, GraphEdge> | null = null;
-
-  // ── File tree state ──────────────────────────────────────────────
   interface FileEntry {
     name: string;
     path: string;
@@ -85,6 +77,19 @@
     loading?: boolean;
     children?: TreeNodeData[];
   }
+
+  // ── State ──────────────────────────────────────────────────────────────
+
+  let graphData: GraphData | null = $state(null);
+  let stats: GraphStats | null = $state(null);
+  let selectedNode: GraphNode | null = $state(null);
+  let error = $state("");
+  let loading = $state(false);
+  let showStats = $state(true);
+  let svgElement: SVGSVGElement;
+  let simulation: d3.Simulation<GraphNode, GraphEdge> | null = null;
+
+  // ── File tree state ────────────────────────────────────────────────────
 
   const HOME = "/Users/johnny";
   let directory = $state(`${HOME}/.ai`);
@@ -114,7 +119,6 @@
         directory: path,
         showHidden,
       });
-      // Show directories + graph files only
       return entries
         .filter(entry => entry.is_dir || isGraphFile(entry))
         .map(toTreeNode);
@@ -131,6 +135,13 @@
   function navigateToDirectory(path: string) {
     directory = path;
     loadRootDirectory();
+  }
+
+  async function handleSetCwd() {
+    const selected = await open({ directory: true, multiple: false });
+    if (selected && typeof selected === "string") {
+      navigateToDirectory(selected);
+    }
   }
 
   async function handleTreeToggle(path: string) {
@@ -166,15 +177,13 @@
     loading = false;
   }
 
-  function handleTreeDblClickDir(path: string) {
-    navigateToDirectory(path);
-  }
-
   function getFileIcon(path: string, isDir: boolean): string {
     if (isDir) return "";
     if (path.endsWith(".jsonld") || path.endsWith(".json-ld")) return "\uD83D\uDD17";
     return "\uD83D\uDCC8";
   }
+
+  // ── Graph rendering ────────────────────────────────────────────────────
 
   function cssVar(name: string): string {
     return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
@@ -407,134 +416,120 @@
   });
 </script>
 
-<SidebarLayout
-  {showSidebar}
+<ContainerLayout
+  appName="ratatoskr"
+  {storagePrefix}
+  sidebarMode="tree"
   sidebarTitle="Graph Files"
-  onCloseSidebar={() => showSidebar = false}
+  bind:directory
+  bind:showHidden
+  {treeNodes}
+  {selectedFile}
+  onTreeToggle={handleTreeToggle}
+  onTreeSelect={handleTreeSelect}
+  onTreeDblClickDir={navigateToDirectory}
+  onDirectoryChange={navigateToDirectory}
+  onSetCwd={handleSetCwd}
+  getTreeIcon={getFileIcon}
+  breadcrumbPath={directory}
+  onBreadcrumbNavigate={navigateToDirectory}
+  {appTabs}
   fullWidth
+  noPadding
 >
-  {#snippet sidebar()}
-    <Breadcrumbs path={directory} onNavigate={navigateToDirectory} />
-    {#if treeNodes.length > 0}
-      {#each treeNodes as node}
-        <TreeNode
-          {node}
-          selected={selectedFile}
-          onToggle={handleTreeToggle}
-          onSelect={handleTreeSelect}
-          onDblClickDir={handleTreeDblClickDir}
-          getIcon={getFileIcon}
-        />
-      {/each}
-    {:else}
-      <div class="sidebar-empty">No graph files found</div>
-    {/if}
-  {/snippet}
+  <div class="graph-layout">
+  <AppHeader appName="RATATOSKR" subtitle="Graph Viewer">
+    {#snippet right()}
+      <div class="button-row">
+        <Button size="sm" onclick={loadSampleGraph} disabled={loading}>
+          {loading ? "Loading..." : "Sample"}
+        </Button>
+        <Button size="sm" onclick={loadGraphFromFile} disabled={loading}>
+          Open...
+        </Button>
+        <Button size="sm" onclick={saveGraph} disabled={!graphData || loading}>
+          Save
+        </Button>
+        <Button variant="ghost" size="sm" onclick={resetZoom} disabled={!graphData}>
+          Reset Zoom
+        </Button>
+        <Button variant="ghost" size="sm" onclick={() => showStats = !showStats}>
+          {showStats ? "Hide Stats" : "Show Stats"}
+        </Button>
+      </div>
+    {/snippet}
+  </AppHeader>
 
-  <main>
-    <AppHeader appName="RATATOSKR" subtitle="Graph Viewer">
-      {#snippet right()}
-        <div class="button-row">
-          {#if !showSidebar}
-            <Button variant="ghost" size="sm" onclick={() => showSidebar = true}>Files</Button>
-          {/if}
-          <Button size="sm" onclick={loadSampleGraph} disabled={loading}>
-            {loading ? "Loading..." : "Sample"}
-          </Button>
-          <Button size="sm" onclick={loadGraphFromFile} disabled={loading}>
-            Open...
-          </Button>
-          <Button size="sm" onclick={saveGraph} disabled={!graphData || loading}>
-            Save
-          </Button>
-          <Button variant="ghost" size="sm" onclick={resetZoom} disabled={!graphData}>
-            Reset Zoom
-          </Button>
-          <Button variant="ghost" size="sm" onclick={() => showStats = !showStats}>
-            {showStats ? "Hide Stats" : "Show Stats"}
-          </Button>
-        </div>
-      {/snippet}
-    </AppHeader>
+  {#if error}
+    <ErrorBanner onDismiss={() => error = ""}>{error}</ErrorBanner>
+  {/if}
 
-    {#if error}
-      <ErrorBanner onDismiss={() => error = ""}>{error}</ErrorBanner>
-    {/if}
+  <div class="graph-container">
+    <svg bind:this={svgElement} class="graph-svg"></svg>
 
-    <div class="graph-container">
-      <svg bind:this={svgElement} class="graph-svg"></svg>
+    {#if showStats && stats}
+      <aside class="stats-panel">
+        <h3>Graph Statistics</h3>
+        <dl>
+          <dt>Nodes</dt>
+          <dd>{stats.node_count}</dd>
+          <dt>Edges</dt>
+          <dd>{stats.edge_count}</dd>
+          <dt>Density</dt>
+          <dd>{(stats.density * 100).toFixed(1)}%</dd>
+        </dl>
 
-      {#if showStats && stats}
-        <aside class="stats-panel">
-          <h3>Graph Statistics</h3>
-          <dl>
-            <dt>Nodes</dt>
-            <dd>{stats.node_count}</dd>
-            <dt>Edges</dt>
-            <dd>{stats.edge_count}</dd>
-            <dt>Density</dt>
-            <dd>{(stats.density * 100).toFixed(1)}%</dd>
-          </dl>
+        <h4>Node Types</h4>
+        <ul class="type-list">
+          {#each Object.entries(stats.node_types) as [type, count]}
+            <li>
+              <span class="type-dot" style="background: {getTypeColor(type)}"></span>
+              {type}: {count}
+            </li>
+          {/each}
+        </ul>
 
-          <h4>Node Types</h4>
+        {#if Object.keys(stats.edge_types).length > 0}
+          <h4>Edge Types</h4>
           <ul class="type-list">
-            {#each Object.entries(stats.node_types) as [type, count]}
-              <li>
-                <span class="type-dot" style="background: {getTypeColor(type)}"></span>
-                {type}: {count}
-              </li>
+            {#each Object.entries(stats.edge_types) as [type, count]}
+              <li>{type}: {count}</li>
             {/each}
           </ul>
-
-          {#if Object.keys(stats.edge_types).length > 0}
-            <h4>Edge Types</h4>
-            <ul class="type-list">
-              {#each Object.entries(stats.edge_types) as [type, count]}
-                <li>{type}: {count}</li>
-              {/each}
-            </ul>
-          {/if}
-        </aside>
-      {/if}
-
-      {#if selectedNode}
-        <aside class="node-panel">
-          <h3>Selected Node</h3>
-          <dl>
-            <dt>ID</dt>
-            <dd>{selectedNode.id}</dd>
-            <dt>Label</dt>
-            <dd>{selectedNode.label}</dd>
-            <dt>Type</dt>
-            <dd>
-              <span class="type-dot" style="background: {getNodeColor(selectedNode)}"></span>
-              {selectedNode.node_type || "default"}
-            </dd>
-          </dl>
-          {#if Object.keys(selectedNode.metadata).length > 0}
-            <h4>Metadata</h4>
-            <pre class="metadata">{JSON.stringify(selectedNode.metadata, null, 2)}</pre>
-          {/if}
-          <Button variant="ghost" onclick={() => selectedNode = null}>Close</Button>
-        </aside>
-      {/if}
-    </div>
-
-    {#if !graphData && !loading}
-      <EmptyState message="Load a graph JSON file or generate a sample graph" />
+        {/if}
+      </aside>
     {/if}
-  </main>
-</SidebarLayout>
+
+    {#if selectedNode}
+      <aside class="node-panel">
+        <h3>Selected Node</h3>
+        <dl>
+          <dt>ID</dt>
+          <dd>{selectedNode.id}</dd>
+          <dt>Label</dt>
+          <dd>{selectedNode.label}</dd>
+          <dt>Type</dt>
+          <dd>
+            <span class="type-dot" style="background: {getNodeColor(selectedNode)}"></span>
+            {selectedNode.node_type || "default"}
+          </dd>
+        </dl>
+        {#if Object.keys(selectedNode.metadata).length > 0}
+          <h4>Metadata</h4>
+          <pre class="metadata">{JSON.stringify(selectedNode.metadata, null, 2)}</pre>
+        {/if}
+        <Button variant="ghost" onclick={() => selectedNode = null}>Close</Button>
+      </aside>
+    {/if}
+  </div>
+
+  {#if !graphData && !loading}
+    <EmptyState message="Load a graph JSON file or generate a sample graph" />
+  {/if}
+  </div>
+</ContainerLayout>
 
 <style>
-  main {
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-    padding: var(--space-lg);
-    overflow: auto;
-  }
-
   .button-row {
     display: flex;
     gap: var(--space-sm);
@@ -542,20 +537,19 @@
     align-items: center;
   }
 
-  .sidebar-empty {
-    padding: var(--space-lg);
-    color: var(--text-muted);
-    font-size: var(--text-sm);
-    text-align: center;
+  .graph-layout {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
   }
 
   .graph-container {
     flex: 1;
     position: relative;
+    min-height: 0;
     background: var(--bg-secondary);
     border-radius: var(--radius-md);
     overflow: hidden;
-    min-height: 400px;
   }
 
   .graph-svg {
@@ -647,5 +641,4 @@
     font-size: var(--text-xs);
     margin: var(--space-sm) 0;
   }
-
 </style>

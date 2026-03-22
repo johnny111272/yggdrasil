@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Checkbox, Button } from "@yggdrasil/ui";
   import type {
     InspectedSchema,
     InspectedSection,
@@ -43,26 +44,11 @@
 
 <!-- Controls bar -->
 <div class="controls">
-  <label>
-    <input type="checkbox" bind:checked={showDescriptions} />
-    descriptions
-  </label>
-  <label>
-    <input type="checkbox" bind:checked={showSemantic} />
-    semantic
-  </label>
-  <label>
-    <input type="checkbox" bind:checked={showConstraints} />
-    constraints
-  </label>
-  <label>
-    <input type="checkbox" bind:checked={showConditionals} />
-    conditionals
-  </label>
-  <label>
-    <input type="checkbox" bind:checked={showExcludes} />
-    excludes
-  </label>
+  <Checkbox bind:checked={showDescriptions} label="descriptions" />
+  <Checkbox bind:checked={showSemantic} label="semantic" />
+  <Checkbox bind:checked={showConstraints} label="constraints" />
+  <Checkbox bind:checked={showConditionals} label="conditionals" />
+  <Checkbox bind:checked={showExcludes} label="excludes" />
 </div>
 
 <!-- Header -->
@@ -87,10 +73,7 @@
   {#each schema.sections as section}
     {@const sReq = reqLabel(section.requirement)}
     <div class="section-block">
-      <button
-        class="section-header"
-        onclick={() => toggleSection(section.name)}
-      >
+      <Button variant="ghost" class="section-header" onclick={() => toggleSection(section.name)}>
         <span class="section-arrow">{collapsedSections.has(section.name) ? '\u25B6' : '\u25BC'}</span>
         <span class="section-name">{section.name}</span>
         <span class={sReq.cssClass}>
@@ -99,7 +82,7 @@
         {#if section.nullable}
           <span class="section-nullable">nullable</span>
         {/if}
-      </button>
+      </Button>
       {#if !collapsedSections.has(section.name)}
         <div class="section-body">
           {#each section.fields as field}
@@ -139,7 +122,7 @@
       <div class="line">
         <span class="group-name">{field.name}</span>
         (<span class={req.cssClass}>{req.label}</span>)
-        {#if req.condCount}<button class="ext ext-conditional badge-btn" onclick={() => showConditionals = !showConditionals}>[conditional: {req.condCount}]</button>{/if}
+        {#if req.condCount}<Button variant="ghost" class="ext ext-conditional badge-btn" active={showConditionals} onclick={() => showConditionals = !showConditionals}>[conditional: {req.condCount}]</Button>{/if}
         {#if field.type.includes('>=')}
           <span class="note"> [{field.type.replace('object ', '')}]</span>
         {/if}
@@ -154,7 +137,7 @@
         <span class="field-name">{field.name}</span>:
         <span class="field-type">array</span>
         — <span class={req.cssClass}>{req.label}</span>
-        {#if req.condCount}<button class="ext ext-conditional badge-btn" onclick={() => showConditionals = !showConditionals}>[conditional: {req.condCount}]</button>{/if}
+        {#if req.condCount}<Button variant="ghost" class="ext ext-conditional badge-btn" active={showConditionals} onclick={() => showConditionals = !showConditionals}>[conditional: {req.condCount}]</Button>{/if}
         {@render badges(field.extensions)}
       </div>
       {@render extensionPanels(field.extensions, depth)}
@@ -170,14 +153,14 @@
           <span class="field-type">{field.type}</span>
           {#if field.defaultValue !== undefined}<span class="field-default"> = {JSON.stringify(field.defaultValue)}</span>{/if}
           — <span class={req.cssClass}>{req.label}</span>
-          {#if req.condCount}<button class="ext ext-conditional badge-btn" onclick={() => showConditionals = !showConditionals}>[conditional: {req.condCount}]</button>{/if}
+          {#if req.condCount}<Button variant="ghost" class="ext ext-conditional badge-btn" active={showConditionals} onclick={() => showConditionals = !showConditionals}>[conditional: {req.condCount}]</Button>{/if}
           {@render badges(field.extensions)}]
         {:else}
           <span class="field-name">{field.name}</span>:
           <span class="field-type">{field.type}</span>
           {#if field.defaultValue !== undefined}<span class="field-default"> = {JSON.stringify(field.defaultValue)}</span>{/if}
           — <span class={req.cssClass}>{req.label}</span>
-          {#if req.condCount}<button class="ext ext-conditional badge-btn" onclick={() => showConditionals = !showConditionals}>[conditional: {req.condCount}]</button>{/if}
+          {#if req.condCount}<Button variant="ghost" class="ext ext-conditional badge-btn" active={showConditionals} onclick={() => showConditionals = !showConditionals}>[conditional: {req.condCount}]</Button>{/if}
           {@render badges(field.extensions)}
         {/if}
       </div>
@@ -216,19 +199,19 @@
     <span class="ext ext-format">[format: {exts.format}]</span>
   {/if}
   {#if exts.notBlock && exts.notBlock.length > 0}
-    <button class="ext ext-excludes badge-btn" class:badge-active={showExcludes} onclick={() => showExcludes = !showExcludes}>
+    <Button variant="ghost" class="ext ext-excludes badge-btn" active={showExcludes} onclick={() => showExcludes = !showExcludes}>
       [excludes: {exts.notBlock.length}]
-    </button>
+    </Button>
   {/if}
   {#if exts.semantic}
-    <button class="ext ext-semantic sev-{exts.semantic.severity} badge-btn" class:badge-active={showSemantic} onclick={() => showSemantic = !showSemantic}>
+    <Button variant="ghost" class="ext ext-semantic sev-{exts.semantic.severity} badge-btn" active={showSemantic} onclick={() => showSemantic = !showSemantic}>
       [semantic: {exts.semantic.severity}]
-    </button>
+    </Button>
   {/if}
   {#if exts.constraint}
-    <button class="ext ext-constraint badge-btn" class:badge-active={showConstraints} onclick={() => showConstraints = !showConstraints}>
+    <Button variant="ghost" class="ext ext-constraint badge-btn" active={showConstraints} onclick={() => showConstraints = !showConstraints}>
       [constraint: {exts.constraint.constraints.length}]
-    </button>
+    </Button>
   {/if}
 {/snippet}
 

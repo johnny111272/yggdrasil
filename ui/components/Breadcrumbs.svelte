@@ -15,21 +15,31 @@
   let crumbs = $derived(buildCrumbs(path, rootPrefix));
 
   function buildCrumbs(fullPath: string, prefix: string): Crumb[] {
-    const display = fullPath.startsWith(prefix)
-      ? "@" + fullPath.slice(prefix.length)
-      : fullPath;
+    if (!fullPath) return [];
 
-    const parts = display.split("/").filter(Boolean);
-    const result: Crumb[] = [];
-    let accumulated = fullPath.startsWith("/") ? "" : "";
+    // Path outside the prefix — show full path segments
+    if (!fullPath.startsWith(prefix)) {
+      const parts = fullPath.split("/").filter(Boolean);
+      const result: Crumb[] = [];
+      let accumulated = "";
+      for (const part of parts) {
+        accumulated += "/" + part;
+        result.push({ label: part, path: accumulated });
+      }
+      return result;
+    }
 
-    const rawParts = fullPath.split("/").filter(Boolean);
-    for (let i = 0; i < rawParts.length; i++) {
-      accumulated += "/" + rawParts[i];
-      result.push({
-        label: parts[i] ?? rawParts[i],
-        path: accumulated,
-      });
+    // Root crumb for the prefix
+    const rootLabel = prefix.endsWith("/.ai") ? "@" : "~";
+    const result: Crumb[] = [{ label: rootLabel, path: prefix }];
+
+    // Segments below the prefix
+    const remainder = fullPath.slice(prefix.length);
+    const parts = remainder.split("/").filter(Boolean);
+    let accumulated = prefix;
+    for (const part of parts) {
+      accumulated += "/" + part;
+      result.push({ label: part, path: accumulated });
     }
 
     return result;

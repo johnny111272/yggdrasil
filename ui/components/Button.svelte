@@ -7,14 +7,26 @@
     active?: boolean;
     disabled?: boolean;
     title?: string;
-    onclick?: () => void;
+    class?: string;
+    style?: string;
+    onclick?: (e: MouseEvent) => void;
     children?: Snippet;
   }
 
-  let { variant = "neutral", size = "md", active = false, disabled = false, title, onclick, children }: Props = $props();
+  let {
+    variant = "neutral",
+    size = "md",
+    active = false,
+    disabled = false,
+    title,
+    class: extraClass = "",
+    style,
+    onclick,
+    children,
+  }: Props = $props();
 </script>
 
-<button class="btn btn-{variant}" class:btn-sm={size === "sm"} class:active {disabled} {title} {onclick}>
+<button class="btn btn-{variant} {extraClass}" class:btn-sm={size === "sm"} class:active {disabled} {title} {style} {onclick}>
   {#if children}
     {@render children()}
   {/if}

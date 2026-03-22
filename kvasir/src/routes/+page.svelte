@@ -7,18 +7,21 @@
 
   let openFile: string | null = $state(null);
 
-  onMount(async () => {
-    const pending = await invoke<string | null>("get_pending_file");
-    if (pending) openFile = pending;
+  onMount(() => {
+    let unlisten: (() => void) | undefined;
 
-    const unlisten = await listen<string>("open-file", (event) => {
-      openFile = event.payload;
+    invoke<string | null>("get_pending_file").then((pending) => {
+      if (pending) openFile = pending;
     });
 
-    return unlisten;
+    listen<string>("open-file", (event) => {
+      openFile = event.payload;
+    }).then((fn) => { unlisten = fn; });
+
+    return () => { unlisten?.(); };
   });
 </script>
 
-<SoloContainer appName="kvasir">
+<SoloContainer>
   <KvasirView {openFile} />
 </SoloContainer>

@@ -13,6 +13,7 @@
     padding: var(--space-2xl);
     overflow-y: auto;
     line-height: 1.7;
+    font-family: inherit;
   }
 
   .markdown-preview :global(h1),
@@ -22,22 +23,23 @@
     color: var(--text-primary);
     margin-top: var(--space-2xl);
     margin-bottom: var(--space-lg);
+    font-family: inherit;
   }
 
   .markdown-preview :global(h1) {
-    font-size: var(--text-3xl);
+    font-size: 1.6em;
     border-bottom: 1px solid var(--border-default);
     padding-bottom: var(--space-md);
   }
 
   .markdown-preview :global(h2) {
-    font-size: var(--text-2xl);
+    font-size: 1.3em;
     border-bottom: 1px solid var(--border-subtle);
     padding-bottom: var(--space-sm);
   }
 
   .markdown-preview :global(h3) {
-    font-size: var(--text-xl);
+    font-size: 1.1em;
   }
 
   .markdown-preview :global(p) {

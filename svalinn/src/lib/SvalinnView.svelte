@@ -3,7 +3,7 @@
   import { homeDir } from "@tauri-apps/api/path";
   import { open } from "@tauri-apps/plugin-dialog";
   import { onMount } from "svelte";
-  import { Button, SidebarLayout, TreeNode, StatCard, SearchInput, FilterBanner, AppHeader, EmptyState, ToggleGroup, Breadcrumbs, Input } from "@yggdrasil/ui";
+  import { Button, ContainerLayout, StatCard, SearchInput, FilterBanner, EmptyState, ToggleGroup, Select, Checkbox, Collapsible } from "@yggdrasil/ui";
 
   let {
     commands = {
@@ -12,6 +12,8 @@
       open_in_editor: "open_in_editor",
       run_saga: "run_saga",
     },
+    storagePrefix = "solo",
+    appTabs,
   }: {
     commands?: {
       scan_directory: string;
@@ -19,6 +21,8 @@
       open_in_editor: string;
       run_saga: string;
     };
+    storagePrefix?: string;
+    appTabs?: { (): any };
   } = $props();
 
   interface Issue {
@@ -65,7 +69,10 @@
     loading: boolean;
   }
 
+  // ── State ──────────────────────────────────────────────────────────────
+
   let directory = $state("");
+  let showHidden = $state(false);
   let includeTests = $state(false);
   let scanResult: ScanResult | null = $state(null);
   let loading = $state(false);
@@ -74,9 +81,22 @@
   let severityFilter = $state("All");
   let toolFilter = $state("All");
   let searchQuery = $state("");
-  let showTree = $state(true);
   let treeRoot: SvalTreeNode | null = $state(null);
   let selectedFile: string | null = $state(null);
+
+  // ── Mode bar ─────────────────────────────────────────────────────────
+
+  const modeOptions = [
+    { value: "by_file", label: "By File", icon: "F" },
+    { value: "by_code", label: "By Error", icon: "E" },
+    { value: "by_tool", label: "By Tool", icon: "T" },
+  ];
+
+  function handleModeChange(value: string) {
+    viewMode = value as "by_file" | "by_code" | "by_tool";
+  }
+
+  // ── Directory navigation ─────────────────────────────────────────────
 
   function parentDir(path: string): string | null {
     const i = path.lastIndexOf("/");
@@ -91,9 +111,17 @@
     loadTree();
   }
 
-  function navigateUp() {
-    const parent = parentDir(directory);
-    if (parent) zoomToDirectory(parent);
+  function handleDirectoryChange(path: string) {
+    zoomToDirectory(path);
+  }
+
+  async function handleSetCwd() {
+    const selected = await open({ directory: true, multiple: false });
+    if (selected && typeof selected === "string") {
+      directory = selected;
+      await refresh();
+      await loadTree();
+    }
   }
 
   onMount(async () => {
@@ -104,17 +132,12 @@
     }
   });
 
-  async function selectDirectory() {
-    const selected = await open({
-      directory: true,
-      multiple: false,
-    });
-    if (selected && typeof selected === "string") {
-      directory = selected;
-      await refresh();
-      await loadTree();
-    }
+  // ── Tree operations ────────────────────────────────────────────────────
+
+  function getTreeNodes(): SvalTreeNode[] {
+    return treeRoot ? treeRoot.children : [];
   }
+  let treeNodes = $derived(getTreeNodes());
 
   async function refresh() {
     if (!directory) return;
@@ -179,7 +202,6 @@
       }
       node.expanded = true;
     }
-    // Trigger reactivity
     treeRoot = treeRoot;
   }
 
@@ -195,6 +217,8 @@
     }
     return null;
   }
+
+  // ── Actions ────────────────────────────────────────────────────────────
 
   async function runSaga() {
     if (!directory) return;
@@ -216,6 +240,8 @@
       // editor open is best-effort
     }
   }
+
+  // ── Derived state ──────────────────────────────────────────────────────
 
   let baseFilteredIssues = $derived.by(() => {
     if (!scanResult) return [];
@@ -351,54 +377,37 @@
   });
 </script>
 
-<SidebarLayout
-  showSidebar={showTree && treeRoot !== null}
+<ContainerLayout
+  appName="svalinn"
+  {storagePrefix}
+  sidebarMode="tree"
   sidebarTitle="Files"
-  onCloseSidebar={() => showTree = false}
+  bind:directory
+  bind:showHidden
+  {treeNodes}
+  {selectedFile}
+  onTreeToggle={handleTreeToggle}
+  onTreeSelect={handleTreeSelect}
+  onTreeDblClickDir={zoomToDirectory}
+  onDirectoryChange={handleDirectoryChange}
+  onSetCwd={handleSetCwd}
+  getTreeBadgeCount={getFilteredCount}
+  getTreeBadgeSeverity={getMaxSeverity}
+  {modeOptions}
+  activeMode={viewMode}
+  onModeChange={handleModeChange}
+  breadcrumbPath={directory}
+  onBreadcrumbNavigate={zoomToDirectory}
+  {appTabs}
 >
-  {#snippet headerExtra()}
-    {#if directory}
-      <Breadcrumbs path={directory} onNavigate={zoomToDirectory} />
-    {/if}
-  {/snippet}
-
-  {#snippet sidebar()}
-    {#if treeRoot}
-      <TreeNode
-        node={treeRoot}
-        selected={selectedFile}
-        onToggle={handleTreeToggle}
-        onSelect={handleTreeSelect}
-        onDblClickDir={zoomToDirectory}
-        getBadgeCount={getFilteredCount}
-        getBadgeSeverity={getMaxSeverity}
-      />
-    {/if}
-  {/snippet}
-
-  <AppHeader appName="SVALINN" subtitle="Code Quality" />
-
   <section class="controls">
-    <div class="directory-row">
-      {#if !showTree && treeRoot}
-        <Button variant="ghost" onclick={() => showTree = true}>&#128450;</Button>
-      {/if}
-      <Button onclick={selectDirectory}>Select Directory</Button>
-      <Input bind:value={directory} placeholder="Or paste path here..." />
-      <Button variant="primary" onclick={refresh} disabled={!directory}>
-        {loading ? "Scanning..." : "Refresh"}
-      </Button>
-      <Button variant="special" onclick={runSaga} disabled={!directory}>
-        {sagaRunning ? "Running..." : "Run Saga"}
-      </Button>
-    </div>
-
-    <div class="options-row">
-      <label>
-        <input type="checkbox" bind:checked={includeTests} />
-        Include tests/
-      </label>
-    </div>
+    <Button variant="primary" onclick={refresh} disabled={!directory}>
+      {loading ? "Scanning..." : "Refresh"}
+    </Button>
+    <Button variant="special" onclick={runSaga} disabled={!directory}>
+      {sagaRunning ? "Running..." : "Run Saga"}
+    </Button>
+    <Checkbox bind:checked={includeTests} label="Include tests/" />
   </section>
 
   {#if scanResult}
@@ -411,38 +420,26 @@
     </section>
 
     <section class="filters">
-      <div class="view-modes">
-        <span>View:</span>
-        <ToggleGroup
-          options={[
-            { value: "by_file", label: "By File" },
-            { value: "by_code", label: "By Error Type" },
-            { value: "by_tool", label: "By Tool" },
-          ]}
-          bind:selected={viewMode}
-        />
-      </div>
-
       <div class="filter-selects">
         <label>
           Severity:
-          <select bind:value={severityFilter}>
+          <Select bind:value={severityFilter}>
             <option>All</option>
             <option value="blocked">Blocked</option>
             <option value="error">Error</option>
             <option value="warning">Warning</option>
             <option value="info">Info</option>
-          </select>
+          </Select>
         </label>
 
         <label>
           Tool:
-          <select bind:value={toolFilter}>
+          <Select bind:value={toolFilter}>
             <option>All</option>
             {#each Object.entries(scanResult.by_tool) as [tool, count]}
               <option value={tool}>{tool} ({count})</option>
             {/each}
-          </select>
+          </Select>
         </label>
       </div>
     </section>
@@ -457,11 +454,7 @@
       <p class="results-count">{filteredIssues.length} issues shown</p>
 
       {#each groupedIssues as [group, issues]}
-        <details class="group" open={groupedIssues.length <= 10}>
-          <summary>
-            <span class="group-name">{viewMode === "by_file" ? relativePath(group) : group}</span>
-            <span class="group-count">{issues.length}</span>
-          </summary>
+        <Collapsible title={viewMode === "by_file" ? relativePath(group) : group} badgeCount={issues.length} open={groupedIssues.length <= 10}>
           <ul class="issues">
             {#each issues as issue}
               <li class="issue-row">
@@ -499,38 +492,21 @@
               </li>
             {/each}
           </ul>
-        </details>
+        </Collapsible>
       {/each}
     </section>
   {:else if !loading}
     <EmptyState message="Select a directory to view .qa sidecars generated by Saga" />
   {/if}
-</SidebarLayout>
+</ContainerLayout>
 
 <style>
   .controls {
-    background: var(--bg-secondary);
-    padding: var(--space-xl);
-    border-radius: var(--radius-md);
-    margin-bottom: var(--space-xl);
-  }
-
-  .directory-row {
-    display: flex;
-    gap: var(--space-sm);
-    margin-bottom: var(--space-lg);
-  }
-
-  .options-row {
-    display: flex;
-    gap: var(--space-lg);
-  }
-
-  .options-row label {
     display: flex;
     align-items: center;
-    gap: var(--space-sm);
-    cursor: pointer;
+    gap: var(--space-md);
+    padding: var(--space-md) var(--space-xl);
+    margin-bottom: var(--space-xl);
   }
 
   .stats {
@@ -546,12 +522,6 @@
     margin-bottom: var(--space-lg);
     flex-wrap: wrap;
     gap: var(--space-lg);
-  }
-
-  .view-modes {
-    display: flex;
-    gap: var(--space-sm);
-    align-items: center;
   }
 
   .filter-selects {
@@ -686,5 +656,4 @@
   .issue-message {
     color: var(--text-muted);
   }
-
 </style>

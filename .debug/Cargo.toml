@@ -1,0 +1,12 @@
+[package]
+name = "test_tokio_multicast"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "time"] }
+
+[[bin]]
+name = "test_tokio_multicast"
+path = "test_tokio_multicast.rs"
+[workspace]

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
+  import { Button, Input } from "@yggdrasil/ui";
   import type { TableData } from "./kvasir-types";
 
   let {
@@ -136,19 +137,14 @@
 
 <div class="table-viewer">
   <div class="table-controls">
-    <input
-      type="text"
-      class="table-filter"
-      placeholder="Filter rows..."
-      bind:value={filterText}
-    />
+    <Input type="text" bind:value={filterText} placeholder="Filter rows..." />
     <span class="row-count">{rowCountLabel}</span>
     {#if tableData}
       <span class="format-badge">{tableData.source_format.toUpperCase()}</span>
     {/if}
-    <button class="export-btn" onclick={exportCsv} disabled={!tableData} title="Export as CSV">
+    <Button variant="neutral" size="sm" disabled={!tableData} title="Export as CSV" onclick={exportCsv}>
       Export CSV
-    </button>
+    </Button>
   </div>
 
   {#if loading}

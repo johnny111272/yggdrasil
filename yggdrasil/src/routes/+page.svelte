@@ -3,7 +3,7 @@
   import SvalinnView from "$svalinn/SvalinnView.svelte";
   import KvasirView from "$kvasir/KvasirView.svelte";
   import RatatoskrView from "$ratatoskr/RatatoskrView.svelte";
-  import { ThemeSwitcher, YggContainer } from "@yggdrasil/ui";
+  import { YggContainer, Button } from "@yggdrasil/ui";
   import { invoke } from "@tauri-apps/api/core";
   import { listen } from "@tauri-apps/api/event";
   import { onMount } from "svelte";
@@ -34,129 +34,119 @@
 
   let hasDormant = $derived(mounted.size > 1);
 
-  onMount(async () => {
-    const pending = await invoke<string | null>("get_pending_file");
-    if (pending) {
-      selectTab("kvasir");
-      openFilePath = pending;
-    }
+  onMount(() => {
+    let unlisten: (() => void) | undefined;
 
-    const unlisten = await listen<string>("open-file", (event) => {
-      selectTab("kvasir");
-      openFilePath = event.payload;
+    invoke<string | null>("get_pending_file").then((pending) => {
+      if (pending) {
+        selectTab("kvasir");
+        openFilePath = pending;
+      }
     });
 
-    return unlisten;
+    listen<string>("open-file", (event) => {
+      selectTab("kvasir");
+      openFilePath = event.payload;
+    }).then((fn) => { unlisten = fn; });
+
+    return () => { unlisten?.(); };
   });
 </script>
 
-<div class="shell">
-  <div class="view-area">
-    <div class="view-pane" class:active={activeTab === "hlidskjalf"}>
-      <YggContainer appName="hlidskjalf">
-        <HlidskjalfView commands={{
-          start_monitor: "hlid_start_monitor",
-          speak: "hlid_speak",
-          open_in_editor: "hlid_open_in_editor",
-        }} onOpenFile={(path, line) => {
-          openFilePath = path;
-          openFileLine = line ?? null;
-          selectTab("kvasir");
-        }} />
-      </YggContainer>
-    </div>
-    {#if mounted.has("svalinn")}
-      <div class="view-pane" class:active={activeTab === "svalinn"}>
-        <YggContainer appName="svalinn">
-          <SvalinnView commands={{
-            scan_directory: "sval_scan_directory",
-            list_qa_tree: "sval_list_qa_tree",
-            open_in_editor: "sval_open_in_editor",
-            run_saga: "sval_run_saga",
-          }} />
-        </YggContainer>
-      </div>
-    {/if}
-    {#if mounted.has("kvasir")}
-      <div class="view-pane" class:active={activeTab === "kvasir"}>
-        <YggContainer appName="kvasir">
-          <KvasirView commands={{
-            list_directory: "kvas_list_directory",
-            read_file: "kvas_read_file",
-            open_in_editor: "kvas_open_in_editor",
-            convert_to_all_formats: "kvas_convert_to_all_formats",
-            detect_data_format: "kvas_detect_data_format",
-            read_jsonl_info: "kvas_read_jsonl_info",
-            read_jsonl_entry: "kvas_read_jsonl_entry",
-            export_entry_as: "kvas_export_entry_as",
-            read_table: "kvas_read_table",
-            export_table_csv: "kvas_export_table_csv",
-          }} openFile={openFilePath} openLine={openFileLine} />
-        </YggContainer>
-      </div>
-    {/if}
-    {#if mounted.has("ratatoskr")}
-      <div class="view-pane" class:active={activeTab === "ratatoskr"}>
-        <YggContainer appName="ratatoskr">
-          <RatatoskrView commands={{
-            list_directory: "rata_list_directory",
-            load_graph: "rata_load_graph",
-            save_graph: "rata_save_graph",
-            get_graph_stats: "rata_get_graph_stats",
-            generate_sample_graph: "rata_generate_sample_graph",
-          }} />
-        </YggContainer>
-      </div>
-    {/if}
-  </div>
-
-  <nav class="tab-strip">
+{#snippet appTabBar()}
+  <nav class="app-tabs">
     {#each tabs as tab}
-      <button
-        class="tab-btn"
-        class:active={activeTab === tab.id}
-        class:mounted={mounted.has(tab.id) && activeTab !== tab.id}
+      <Button
+        variant="ghost"
+        size="sm"
+        class="app-tab {mounted.has(tab.id) && activeTab !== tab.id ? 'mounted' : ''}"
+        active={activeTab === tab.id}
         onclick={() => selectTab(tab.id)}
         title="{tab.label} — {tab.desc}"
       >
-        {#each tab.label.split("") as char}
-          <span class="tab-char">{char}</span>
-        {/each}
-      </button>
+        {tab.label}
+      </Button>
     {/each}
-    <div class="theme-area">
-      <ThemeSwitcher />
-    </div>
     {#if hasDormant}
-      <button
-        class="tab-btn clear-btn"
-        onclick={clearDormant}
-        title="Clear dormant tabs"
-      >
-        <span class="tab-char">&times;</span>
-      </button>
+      <Button variant="ghost" size="sm" class="app-tab clear-tab" onclick={clearDormant} title="Clear dormant tabs">
+        &times;
+      </Button>
     {/if}
   </nav>
+{/snippet}
+
+<div class="shell">
+  <div class="view-pane" class:active={activeTab === "hlidskjalf"}>
+    <YggContainer>
+      <HlidskjalfView storagePrefix="ygg" appTabs={appTabBar} commands={{
+        start_monitor: "hlid_start_monitor",
+        speak: "hlid_speak",
+        open_in_editor: "hlid_open_in_editor",
+      }} onOpenFile={(path, line) => {
+        openFilePath = path;
+        openFileLine = line ?? null;
+        selectTab("kvasir");
+      }} />
+    </YggContainer>
+  </div>
+  {#if mounted.has("svalinn")}
+    <div class="view-pane" class:active={activeTab === "svalinn"}>
+      <YggContainer>
+        <SvalinnView storagePrefix="ygg" appTabs={appTabBar} commands={{
+          scan_directory: "sval_scan_directory",
+          list_qa_tree: "sval_list_qa_tree",
+          open_in_editor: "sval_open_in_editor",
+          run_saga: "sval_run_saga",
+        }} />
+      </YggContainer>
+    </div>
+  {/if}
+  {#if mounted.has("kvasir")}
+    <div class="view-pane" class:active={activeTab === "kvasir"}>
+      <YggContainer>
+        <KvasirView storagePrefix="ygg" appTabs={appTabBar} commands={{
+          list_directory: "kvas_list_directory",
+          read_file: "kvas_read_file",
+          open_in_editor: "kvas_open_in_editor",
+          convert_to_all_formats: "kvas_convert_to_all_formats",
+          detect_data_format: "kvas_detect_data_format",
+          read_jsonl_info: "kvas_read_jsonl_info",
+          read_jsonl_entry: "kvas_read_jsonl_entry",
+          export_entry_as: "kvas_export_entry_as",
+          read_table: "kvas_read_table",
+          export_table_csv: "kvas_export_table_csv",
+        }} openFile={openFilePath} openLine={openFileLine} />
+      </YggContainer>
+    </div>
+  {/if}
+  {#if mounted.has("ratatoskr")}
+    <div class="view-pane" class:active={activeTab === "ratatoskr"}>
+      <YggContainer>
+        <RatatoskrView storagePrefix="ygg" appTabs={appTabBar} commands={{
+          list_directory: "rata_list_directory",
+          load_graph: "rata_load_graph",
+          save_graph: "rata_save_graph",
+          get_graph_stats: "rata_get_graph_stats",
+          generate_sample_graph: "rata_generate_sample_graph",
+        }} />
+      </YggContainer>
+    </div>
+  {/if}
 </div>
 
 <style>
   .shell {
-    display: flex;
     height: 100vh;
+    position: relative;
     background: var(--bg-primary);
     color: var(--text-primary);
-  }
-
-  .view-area {
-    flex: 1;
     overflow: hidden;
-    position: relative;
   }
 
   .view-pane {
     position: absolute;
     inset: 0;
-    overflow: auto;
+    overflow: hidden;
     visibility: hidden;
     pointer-events: none;
   }
@@ -166,67 +156,45 @@
     pointer-events: auto;
   }
 
-  .tab-strip {
-    width: 28px;
-    background: var(--bg-secondary);
-    border-left: 1px solid var(--border-default);
+  /* ── App tabs (rendered inside ContainerLayout via appTabs snippet) ── */
+
+  :global(.app-tabs) {
     display: flex;
-    flex-direction: column;
     align-items: center;
-    padding: var(--space-md) 0;
-    gap: var(--space-md);
-    flex-shrink: 0;
-    overflow: hidden;
+    gap: var(--space-xs);
+    padding: var(--space-xs) var(--space-md);
   }
 
-  .tab-btn {
+  :global(.app-tab) {
     border: none;
     border-radius: var(--radius-sm);
     background: transparent;
     color: var(--text-secondary);
     font-family: var(--font-mono);
-    font-size: 0.75rem;
+    font-size: var(--text-xs);
     font-weight: 500;
-    letter-spacing: 0.05em;
     cursor: pointer;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0;
-    padding: var(--space-xs) 2px;
-    line-height: 1;
-    width: 100%;
+    padding: var(--space-2xs) var(--space-lg);
+    transition: var(--transition-fast);
   }
 
-  .tab-char {
-    display: block;
-    height: 0.9rem;
-    line-height: 0.9rem;
-  }
-
-  .tab-btn:hover {
+  :global(.app-tab:hover) {
     background: var(--bg-hover);
     color: var(--text-primary);
   }
 
-  .tab-btn.mounted {
+  :global(.app-tab.mounted) {
     color: var(--text-primary);
   }
 
-  .tab-btn.active {
+  :global(.app-tab.active) {
     background: var(--action-primary);
     color: var(--text-primary);
     font-weight: 700;
   }
 
-  .theme-area {
-    margin-top: auto;
-    padding: var(--space-xs) 0;
-    border-top: 1px solid var(--border-subtle);
-  }
-
-  .clear-btn {
-    font-size: 0.75rem;
-    color: var(--text-secondary);
+  :global(.clear-tab) {
+    margin-left: auto;
+    font-size: var(--text-sm);
   }
 </style>
